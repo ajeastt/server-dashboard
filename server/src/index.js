@@ -110,9 +110,13 @@ wss.on('connection', (ws) => {
 
       // ── Logs ──
       case 'logs': {
+        if (logStream) {
+          try { logStream.destroy(); } catch {}
+          logStream = null;
+        }
         try {
           const container = await getContainer(msg.container);
-          const logStream = await container.logs({
+          logStream = await container.logs({
             follow: true,
             stdout: true,
             stderr: true,

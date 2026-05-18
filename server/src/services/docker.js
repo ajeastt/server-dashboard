@@ -287,6 +287,12 @@ export async function deployStack(name, composeYaml) {
   return { success: true, name };
 }
 
+export async function restartStack(name) {
+  const { execSync } = await import('child_process');
+  execSync(`docker compose -p ${name} restart`, { stdio: 'pipe' });
+  return { success: true, name };
+}
+
 export async function destroyStack(name) {
   const { execSync } = await import('child_process');
   execSync(`docker compose -p ${name} down --volumes --remove-orphans`, { stdio: 'pipe' });

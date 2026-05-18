@@ -88,6 +88,15 @@ export default function Containers() {
     }
   }
 
+  const handleRestartStack = async (name) => {
+    try {
+      await api.docker.restartStack(name)
+      fetchAll()
+    } catch (err) {
+      console.error('Failed to restart stack:', err)
+    }
+  }
+
   const handleDestroy = async (name) => {
     if (!confirm(`Destroy stack "${name}"? This will remove all associated containers and volumes.`)) return
     try {
@@ -205,6 +214,9 @@ export default function Containers() {
                     <span className="text-xs text-surface-500">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => handleRestartStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all" title="Restart stack">
+                      <RefreshCw className="w-4 h-4" />
+                    </button>
                     <button onClick={() => handleEdit(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Edit compose">
                       <Edit3 className="w-4 h-4" />
                     </button>
