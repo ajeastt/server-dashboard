@@ -207,12 +207,31 @@ export async function destroyStack(name) {
 
 export async function getStackCompose(name) {
   const fs = await import('fs');
-  const paths = [
+  const containers = await docker.listContainers({ all: true });
+  for (const c of containers) {
+    const info = await docker.getContainer(c.Id).inspect();
+    const labels = info.Config.Labels || {};
+    if (labels['com.docker.compose.project'] === name) {
+      const configFiles = labels['com.docker.compose.project.config_files'];
+      if (configFiles) {
+        try {
+          const paths = JSON.parse(configFiles);
+          for (const p of paths) {
+            try {
+              const content = await fs.promises.readFile(p, 'utf8');
+              return { content, path: p };
+            } catch {}
+          }
+        } catch {}
+      }
+    }
+  }
+  const fallbacks = [
     `/tmp/stacks/${name}/docker-compose.yml`,
     `/opt/stacks/${name}/compose.yaml`,
     `/opt/stacks/${name}/docker-compose.yml`,
   ];
-  for (const p of paths) {
+  for (const p of fallbacks) {
     try {
       const content = await fs.promises.readFile(p, 'utf8');
       return { content, path: p };

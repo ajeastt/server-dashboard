@@ -64,6 +64,7 @@ export default function Stacks() {
 
   const handleEdit = async (name) => {
     setEditStack(name)
+    setEditYaml('')
     setEditLoading(true)
     setError('')
     try {
@@ -71,7 +72,6 @@ export default function Stacks() {
       setEditYaml(content)
     } catch (err) {
       setError(err.message)
-      setEditStack(null)
     } finally {
       setEditLoading(false)
     }
