@@ -1,15 +1,27 @@
 import si from 'systeminformation';
+import Docker from 'dockerode';
+
+const docker = new Docker();
 
 let subscribers = [];
 let intervalId = null;
 
+const TIMEOUT = 5000;
+
+function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms)),
+  ]);
+}
+
 async function collectMetrics() {
   const results = await Promise.allSettled([
-    si.currentLoad(),
-    si.mem(),
-    si.fsSize(),
-    si.networkStats(),
-    si.dockerContainers('all'),
+    withTimeout(si.currentLoad(), TIMEOUT),
+    withTimeout(si.mem(), TIMEOUT),
+    withTimeout(si.fsSize(), TIMEOUT),
+    withTimeout(si.networkStats(), TIMEOUT),
+    withTimeout(docker.listContainers({ all: true }), TIMEOUT),
   ]);
 
   const cpu = results[0].status === 'fulfilled' ? results[0].value : { currentLoad: 0, cpus: [] };

@@ -206,12 +206,25 @@ export async function destroyStack(name) {
 }
 
 export async function getStackCompose(name) {
-  const { execSync } = await import('child_process');
+  const fs = await import('fs');
+  const tmpPath = `/tmp/stacks/${name}/docker-compose.yml`;
   try {
-    const content = execSync(`docker compose -p ${name} config`, { encoding: 'utf8', stdio: 'pipe' });
+    const containers = await docker.listContainers({ all: true });
+    for (const c of containers) {
+      const labels = c.Labels || {};
+      if (labels['com.docker.compose.project'] === name) {
+        const configFiles = labels['com.docker.compose.project.config_files'];
+        if (configFiles) {
+          const firstPath = configFiles.split(',')[0].trim();
+          const content = await fs.promises.readFile(firstPath, 'utf8');
+          return { content };
+        }
+      }
+    }
+    const content = await fs.promises.readFile(tmpPath, 'utf8');
     return { content };
   } catch (err) {
-    throw new Error(`Cannot read compose config for stack "${name}": ${err.stderr || err.message}`);
+    throw new Error(`Cannot read compose config for stack "${name}": ${err.message}`);
   }
 }
 
