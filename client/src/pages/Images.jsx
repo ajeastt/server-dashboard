@@ -89,7 +89,11 @@ export default function Images() {
       </div>
 
       {message && (
-        <div className="p-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm text-accent-400 flex items-center justify-between">
+        <div className={`p-3 rounded-lg border text-sm flex items-center justify-between ${
+          message.toLowerCase().includes('error') || message.toLowerCase().includes('fail') || message.toLowerCase().includes('conflict') || message.toLowerCase().includes('in use')
+            ? 'bg-red-500/10 border-red-500/20 text-red-400'
+            : 'bg-accent-500/10 border-accent-500/20 text-accent-400'
+        }`}>
           <span>{message}</span>
           <button onClick={() => setMessage('')}><X className="w-4 h-4" /></button>
         </div>
@@ -127,7 +131,12 @@ export default function Images() {
                     <tr key={img.id} className={`border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors ${img.dangling ? 'opacity-50' : ''}`}>
                       <td className="py-3 px-4 text-surface-200 font-medium">
                         {img.dangling ? (
-                          <span className="text-amber-400">dangling</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-amber-400">dangling</span>
+                            {img.usedBy?.length > 0 && (
+                              <span className="text-xs text-surface-500">(in use by {img.usedBy.length})</span>
+                            )}
+                          </div>
                         ) : (
                           repo || '<none>'
                         )}
@@ -178,7 +187,16 @@ export default function Images() {
                               </button>
                             </>
                           )}
-                          <button onClick={() => handleRemove(img.id)} className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remove">
+                          <button
+                            onClick={() => handleRemove(img.id)}
+                            disabled={img.usedBy?.length > 0}
+                            className={`p-1.5 rounded-lg transition-all ${
+                              img.usedBy?.length > 0
+                                ? 'text-surface-600 cursor-not-allowed'
+                                : 'text-surface-500 hover:text-red-400 hover:bg-red-500/10'
+                            }`}
+                            title={img.usedBy?.length > 0 ? `In use by ${img.usedBy.length} container(s)` : 'Remove'}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>

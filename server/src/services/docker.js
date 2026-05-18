@@ -78,7 +78,16 @@ export async function createExec(id, cols = 80, rows = 24) {
 // ── Images ──
 
 export async function listImages() {
-  const images = await docker.listImages({ all: false });
+  const [images, containers] = await Promise.all([
+    docker.listImages({ all: false }),
+    docker.listContainers({ all: true }),
+  ]);
+  const imgById = {};
+  for (const c of containers) {
+    const imageId = c.ImageID || '';
+    if (!imgById[imageId]) imgById[imageId] = [];
+    imgById[imageId].push(c.Names[0]?.replace(/^\//, '') || c.Id.slice(0, 12));
+  }
   return images.map((i) => ({
     id: i.Id.slice(7, 19),
     tags: i.RepoTags || [],
@@ -86,6 +95,7 @@ export async function listImages() {
     dangling: !i.RepoTags || i.RepoTags.every((t) => t === '<none>:<none>'),
     size: i.Size,
     created: i.Created,
+    usedBy: imgById[i.Id] || [],
   })).sort((a, b) => b.created - a.created);
 }
 
@@ -163,12 +173,28 @@ export async function checkImageUpdate(name) {
 
 export async function removeImage(id) {
   const image = docker.getImage(id);
-  await image.remove({ force: true });
+  try {
+    await image.remove({ force: true });
+  } catch (err) {
+    if (err.statusCode === 409) {
+      const containers = await docker.listContainers({ all: true });
+      const using = containers.filter((c) => c.ImageID && c.ImageID.includes(id) || (c.Image && c.Image.includes(id)));
+      const names = using.map((c) => c.Names[0]?.replace(/^\//, '') || c.Id.slice(0, 12));
+      if (names.length > 0) {
+        throw new Error(`Image is in use by container(s): ${names.join(', ')}. Stop them first.`);
+      }
+    }
+    throw err;
+  }
 }
 
 export async function pruneImages() {
-  const result = await docker.pruneImages();
-  return result;
+  try {
+    const result = await docker.pruneImages();
+    return result;
+  } catch (err) {
+    throw new Error(`Failed to prune images: ${err.message}`);
+  }
 }
 
 // ── Volumes ──
