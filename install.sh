@@ -11,7 +11,7 @@ NC='\033[0m'
 # ── Defaults ──
 INSTALL_DIR="/opt/server-dashboard"
 PORT="${SERVERDASH_PORT:-3001}"
-REPO_URL="https://github.com/aeast/server-dashboard"
+REPO_URL="https://github.com/ajeastt/server-dashboard"
 RAW_URL="$REPO_URL/raw/main"
 BUILD_LOCAL=false
 

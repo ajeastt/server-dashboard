@@ -1,6 +1,6 @@
 services:
   server-dashboard:
-    image: ghcr.io/aeast/server-dashboard:latest
+    image: ghcr.io/ajeastt/server-dashboard:latest
     container_name: server-dashboard
     ports:
       - "${SERVERDASH_PORT:-3001}:3001"
