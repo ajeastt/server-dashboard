@@ -2,8 +2,11 @@ import { Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Containers from './pages/Containers.jsx'
-import Stacks from './pages/Stacks.jsx'
 import ContainerDetail from './pages/ContainerDetail.jsx'
+import Stacks from './pages/Stacks.jsx'
+import Images from './pages/Images.jsx'
+import Volumes from './pages/Volumes.jsx'
+import Networks from './pages/Networks.jsx'
 
 export default function App() {
   return (
@@ -13,6 +16,9 @@ export default function App() {
         <Route path="/containers" element={<Containers />} />
         <Route path="/containers/:id" element={<ContainerDetail />} />
         <Route path="/stacks" element={<Stacks />} />
+        <Route path="/images" element={<Images />} />
+        <Route path="/volumes" element={<Volumes />} />
+        <Route path="/networks" element={<Networks />} />
       </Route>
     </Routes>
   )

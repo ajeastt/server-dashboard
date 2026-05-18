@@ -24,23 +24,54 @@ export const api = {
     action: (id, action) => fetchJson(`/docker/containers/${id}/${action}`, { method: 'POST' }),
     stacks: () => fetchJson('/docker/stacks'),
     deployStack: (name, compose) =>
-      fetchJson('/docker/stacks', {
-        method: 'POST',
-        body: JSON.stringify({ name, compose }),
-      }),
+      fetchJson('/docker/stacks', { method: 'POST', body: JSON.stringify({ name, compose }) }),
     destroyStack: (name) =>
       fetchJson(`/docker/stacks/${name}`, { method: 'DELETE' }),
+
+    images: () => fetchJson('/docker/images'),
+    pullImage: (name) => fetchJson('/docker/images/pull', { method: 'POST', body: JSON.stringify({ name }) }),
+    removeImage: (id) => fetchJson(`/docker/images/${id}`, { method: 'DELETE' }),
+    pruneImages: () => fetchJson('/docker/images/prune', { method: 'POST' }),
+
+    volumes: () => fetchJson('/docker/volumes'),
+    removeVolume: (name) => fetchJson(`/docker/volumes/${name}`, { method: 'DELETE' }),
+    pruneVolumes: () => fetchJson('/docker/volumes/prune', { method: 'POST' }),
+
+    networks: () => fetchJson('/docker/networks'),
+    removeNetwork: (id) => fetchJson(`/docker/networks/${id}`, { method: 'DELETE' }),
+    pruneNetworks: () => fetchJson('/docker/networks/prune', { method: 'POST' }),
+
+    prune: () => fetchJson('/docker/prune', { method: 'POST' }),
   },
 };
 
-export function connectMetrics(callback) {
+// ── WebSocket connection with message dispatch ──
+
+export function createWS() {
   const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+
+  const handlers = {};
+
   ws.onmessage = (event) => {
     try {
-      callback(JSON.parse(event.data));
+      const msg = JSON.parse(event.data);
+      const h = handlers[msg.type];
+      if (h) h(msg);
     } catch {}
   };
-  ws.onerror = () => {};
-  return () => ws.close();
+
+  return {
+    send: (data) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(data)); },
+    on: (type, fn) => { handlers[type] = fn; },
+    close: () => ws.close(),
+    raw: ws,
+  };
+}
+
+export function connectMetrics(callback) {
+  const ws = createWS();
+  ws.on('metrics', (msg) => callback(msg.data));
+  ws.send({ type: 'subscribe', channel: 'metrics' });
+  return () => { ws.send({ type: 'unsubscribe', channel: 'metrics' }); ws.close(); };
 }

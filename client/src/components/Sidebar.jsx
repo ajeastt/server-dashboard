@@ -1,18 +1,46 @@
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import {
   Gauge,
   Container,
   Layers,
+  Image,
+  HardDrive,
+  Share2,
   Server,
+  Eraser,
+  Check,
+  Loader,
 } from 'lucide-react'
+import { api } from '../lib/api'
 
 const links = [
   { to: '/', label: 'Dashboard', icon: Gauge },
   { to: '/containers', label: 'Containers', icon: Container },
   { to: '/stacks', label: 'Stacks', icon: Layers },
+  { to: '/images', label: 'Images', icon: Image },
+  { to: '/volumes', label: 'Volumes', icon: HardDrive },
+  { to: '/networks', label: 'Networks', icon: Share2 },
 ]
 
 export default function Sidebar() {
+  const [pruning, setPruning] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const handlePrune = async () => {
+    if (!confirm('Run docker system prune? This removes unused containers, images, networks, and build cache.')) return
+    setPruning(true)
+    try {
+      await api.docker.prune()
+      setDone(true)
+      setTimeout(() => setDone(false), 3000)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setPruning(false)
+    }
+  }
+
   return (
     <aside className="w-16 lg:w-56 border-r border-surface-800 bg-surface-900 flex flex-col shrink-0">
       <div className="h-14 flex items-center gap-2.5 px-4 lg:px-5 border-b border-surface-800">
@@ -24,7 +52,7 @@ export default function Sidebar() {
         </span>
       </div>
 
-      <nav className="flex-1 py-3 px-2 lg:px-3 space-y-1">
+      <nav className="flex-1 py-3 px-2 lg:px-3 space-y-1 overflow-y-auto">
         {links.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
@@ -44,8 +72,22 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      <div className="p-3 border-t border-surface-800 hidden lg:block">
-        <p className="text-xs text-surface-500">Server Dashboard v1.0</p>
+      <div className="p-3 border-t border-surface-800 space-y-2">
+        <button
+          onClick={handlePrune}
+          disabled={pruning}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-50
+            bg-surface-800/50 text-surface-400 hover:text-surface-200 hover:bg-surface-800"
+        >
+          {pruning ? (
+            <Loader className="w-3.5 h-3.5 animate-spin" />
+          ) : done ? (
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+          ) : (
+            <Eraser className="w-3.5 h-3.5" />
+          )}
+          <span className="hidden lg:block">{pruning ? 'Pruning...' : done ? 'Done' : 'System Prune'}</span>
+        </button>
       </div>
     </aside>
   )
