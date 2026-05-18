@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Image, Trash2, RefreshCw, Download, Plus, X, Loader } from 'lucide-react'
+import { Image, Trash2, RefreshCw, Download, Plus, X, Loader, AlertTriangle, CheckCircle } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatBytes } from '../lib/utils'
+import PullProgressModal from '../components/PullProgressModal'
+
+const CHECK_INTERVAL = 300000
 
 export default function Images() {
   const [images, setImages] = useState([])
@@ -9,7 +12,9 @@ export default function Images() {
   const [showPull, setShowPull] = useState(false)
   const [pullName, setPullName] = useState('')
   const [message, setMessage] = useState('')
-  const [pulling, setPulling] = useState({})
+  const [pulling, setPulling] = useState(null)
+  const [checking, setChecking] = useState({})
+  const [updates, setUpdates] = useState({})
 
   const fetch = useCallback(async () => {
     try { setImages(await api.docker.images()) }
@@ -31,16 +36,9 @@ export default function Images() {
     } catch (err) { setMessage(err.message) }
   }
 
-  const handlePullLatest = async (repo) => {
+  const handlePullLatest = (repo) => {
     const name = `${repo}:latest`
-    setPulling((p) => ({ ...p, [name]: true }))
-    setMessage('')
-    try {
-      await api.docker.pullImage(name)
-      setMessage(`Pulled ${name}`)
-      fetch()
-    } catch (err) { setMessage(err.message) }
-    finally { setPulling((p) => { const n = { ...p }; delete n[name]; return n }) }
+    setPulling(name)
   }
 
   const handleRemove = async (id) => {
@@ -53,6 +51,24 @@ export default function Images() {
     if (!confirm('Remove all unused images?')) return
     try { const r = await api.docker.pruneImages(); setMessage(`Pruned: reclaimed ${formatBytes(r.SpaceReclaimed || 0)}`); fetch() }
     catch (err) { setMessage(err.message) }
+  }
+
+  const handleCheckUpdate = async (repo) => {
+    const name = `${repo}:latest`
+    setChecking((p) => ({ ...p, [name]: true }))
+    try {
+      const result = await api.docker.checkImageUpdate(name)
+      setUpdates((p) => ({ ...p, [name]: result }))
+    } catch (err) {
+      setUpdates((p) => ({ ...p, [name]: { error: err.message } }))
+    } finally {
+      setChecking((p) => ({ ...p, [name]: false }))
+    }
+  }
+
+  const handlePullDone = () => {
+    setPulling(null)
+    fetch()
   }
 
   return (
@@ -101,48 +117,75 @@ export default function Images() {
                 </tr>
               </thead>
               <tbody>
-                {images.map((img) => (
-                  <tr key={img.id} className={`border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors ${img.dangling ? 'opacity-50' : ''}`}>
-                    <td className="py-3 px-4 text-surface-200 font-medium">
-                      {img.dangling ? (
-                        <span className="text-amber-400">dangling</span>
-                      ) : (
-                        img.tags[0]?.split(':')[0] || '<none>'
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      {img.dangling ? (
-                        <span className="px-2 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-400 font-mono">—</span>
-                      ) : (
-                        <span className="px-2 py-0.5 text-xs rounded-md bg-surface-800 text-surface-400 font-mono">
-                          {img.tags[0]?.split(':')[1] || '<none>'}
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4 text-right text-surface-400">{formatBytes(img.size)}</td>
-                    <td className="py-3 px-4 text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        {!img.dangling && img.tags[0] && (
-                          <button
-                            onClick={() => handlePullLatest(img.tags[0].split(':')[0])}
-                            disabled={pulling[`${img.tags[0].split(':')[0]}:latest`]}
-                            className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50"
-                            title="Pull latest"
-                          >
-                            {pulling[`${img.tags[0].split(':')[0]}:latest`] ? (
-                              <Loader className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Download className="w-4 h-4" />
-                            )}
-                          </button>
+                {images.map((img) => {
+                  const repo = !img.dangling && img.tags[0] ? img.tags[0].split(':')[0] : null
+                  const tag = !img.dangling && img.tags[0] ? img.tags[0].split(':')[1] : null
+                  const updateKey = repo ? `${repo}:latest` : null
+                  const updateInfo = updateKey ? updates[updateKey] : null
+
+                  return (
+                    <tr key={img.id} className={`border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors ${img.dangling ? 'opacity-50' : ''}`}>
+                      <td className="py-3 px-4 text-surface-200 font-medium">
+                        {img.dangling ? (
+                          <span className="text-amber-400">dangling</span>
+                        ) : (
+                          repo || '<none>'
                         )}
-                        <button onClick={() => handleRemove(img.id)} className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remove">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      </td>
+                      <td className="py-3 px-4">
+                        {img.dangling ? (
+                          <span className="px-2 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-400 font-mono">—</span>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="px-2 py-0.5 text-xs rounded-md bg-surface-800 text-surface-400 font-mono">
+                              {tag || '<none>'}
+                            </span>
+                            {updateInfo && !updateInfo.error && (
+                              <span className={`text-xs ${updateInfo.updateAvailable ? 'text-amber-400' : 'text-emerald-400'}`}>
+                                {updateInfo.updateAvailable ? 'Update available' : 'Up to date'}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right text-surface-400">{formatBytes(img.size)}</td>
+                      <td className="py-3 px-4 text-right">
+                        <div className="flex items-center justify-end gap-1">
+                          {repo && (
+                            <>
+                              <button
+                                onClick={() => handleCheckUpdate(repo)}
+                                disabled={checking[updateKey]}
+                                className="p-1.5 rounded-lg text-surface-500 hover:text-amber-400 hover:bg-amber-500/10 transition-all disabled:opacity-50"
+                                title="Check for update"
+                              >
+                                {checking[updateKey] ? (
+                                  <Loader className="w-4 h-4 animate-spin" />
+                                ) : updateInfo && !updateInfo.error && updateInfo.updateAvailable ? (
+                                  <AlertTriangle className="w-4 h-4 text-amber-400" />
+                                ) : updateInfo && !updateInfo.error ? (
+                                  <CheckCircle className="w-4 h-4 text-emerald-400" />
+                                ) : (
+                                  <RefreshCw className="w-4 h-4" />
+                                )}
+                              </button>
+                              <button
+                                onClick={() => handlePullLatest(repo)}
+                                className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all"
+                                title="Pull latest"
+                              >
+                                <Download className="w-4 h-4" />
+                              </button>
+                            </>
+                          )}
+                          <button onClick={() => handleRemove(img.id)} className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remove">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -174,6 +217,14 @@ export default function Images() {
             </form>
           </div>
         </div>
+      )}
+
+      {pulling && (
+        <PullProgressModal
+          name={pulling}
+          onClose={() => setPulling(null)}
+          onDone={handlePullDone}
+        />
       )}
     </div>
   )

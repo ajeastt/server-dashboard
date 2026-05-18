@@ -82,6 +82,7 @@ export async function listImages() {
   return images.map((i) => ({
     id: i.Id.slice(7, 19),
     tags: i.RepoTags || [],
+    digests: i.RepoDigests || [],
     dangling: !i.RepoTags || i.RepoTags.every((t) => t === '<none>:<none>'),
     size: i.Size,
     created: i.Created,
@@ -98,6 +99,66 @@ export async function pullImage(name) {
       });
     });
   });
+}
+
+export async function pullImageStream(name, onProgress) {
+  return new Promise((resolve, reject) => {
+    docker.pull(name, (err, stream) => {
+      if (err) return reject(err);
+      stream.on('data', (chunk) => {
+        const lines = chunk.toString().trim().split('\n');
+        for (const line of lines) {
+          try {
+            const obj = JSON.parse(line);
+            onProgress(obj);
+          } catch {}
+        }
+      });
+      stream.on('end', () => resolve());
+      stream.on('error', (err) => reject(err));
+    });
+  });
+}
+
+export async function checkImageUpdate(name) {
+  let tag = 'latest';
+  let imageRepo = name;
+  if (name.includes(':')) {
+    imageRepo = name.split(':')[0];
+    tag = name.split(':')[1];
+  }
+
+  let registryRepo = imageRepo;
+  if (!imageRepo.includes('/')) {
+    registryRepo = 'library/' + imageRepo;
+  }
+
+  try {
+    const authRes = await fetch(`https://auth.docker.io/token?service=registry.docker.io&scope=repository:${registryRepo}:pull`);
+    if (!authRes.ok) return { name, error: 'auth_failed' };
+    const { token } = await authRes.json();
+
+    const manifestRes = await fetch(`https://registry-1.docker.io/v2/${registryRepo}/manifests/${tag}`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/vnd.docker.distribution.manifest.v2+json',
+      },
+    });
+    if (!manifestRes.ok) return { name, error: 'manifest_fetch_failed' };
+
+    const remoteDigest = manifestRes.headers.get('docker-content-digest');
+
+    const images = await docker.listImages();
+    const local = images.find((i) => (i.RepoTags || []).some((t) => t === `${imageRepo}:${tag}`));
+    const localDigest = local ? (local.RepoDigests || []).find((d) => d.includes(imageRepo)) : null;
+    const localDigestVal = localDigest ? localDigest.split('@')[1] : null;
+
+    const updateAvailable = localDigestVal ? localDigestVal !== remoteDigest : true;
+
+    return { name, tag, remoteDigest, localDigest: localDigestVal, updateAvailable };
+  } catch {
+    return { name, error: 'registry_unreachable' };
+  }
 }
 
 export async function removeImage(id) {

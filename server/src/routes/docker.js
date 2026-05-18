@@ -2,7 +2,7 @@ import { Router } from 'express';
 import {
   listContainers, getContainer, getContainerStats, getContainerLogs, executeAction,
   listStacks, deployStack, destroyStack, getStackCompose, updateStackCompose,
-  listImages, pullImage, removeImage, pruneImages,
+  listImages, pullImage, pullImageStream, checkImageUpdate, removeImage, pruneImages,
   listVolumes, removeVolume, pruneVolumes,
   listNetworks, removeNetwork, pruneNetworks,
   systemPrune,
@@ -46,6 +46,31 @@ dockerRouter.get('/images', async (req, res) => {
 
 dockerRouter.post('/images/pull', async (req, res) => {
   try { await pullImage(req.body.name); res.json({ success: true }); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dockerRouter.get('/images/pull-stream', async (req, res) => {
+  const name = req.query.name;
+  if (!name) return res.status(400).json({ error: 'name query param required' });
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  try {
+    await pullImageStream(name, (progress) => {
+      res.write(`data: ${JSON.stringify(progress)}\n\n`);
+    });
+    res.write(`event: done\ndata: {}\n\n`);
+  } catch (err) {
+    res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+  } finally {
+    res.end();
+  }
+});
+
+dockerRouter.post('/images/check-update', async (req, res) => {
+  try { res.json(await checkImageUpdate(req.body.name)); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 

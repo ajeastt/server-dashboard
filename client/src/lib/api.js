@@ -33,6 +33,7 @@ export const api = {
 
     images: () => fetchJson('/docker/images'),
     pullImage: (name) => fetchJson('/docker/images/pull', { method: 'POST', body: JSON.stringify({ name }) }),
+    checkImageUpdate: (name) => fetchJson('/docker/images/check-update', { method: 'POST', body: JSON.stringify({ name }) }),
     removeImage: (id) => fetchJson(`/docker/images/${id}`, { method: 'DELETE' }),
     pruneImages: () => fetchJson('/docker/images/prune', { method: 'POST' }),
 
