@@ -206,45 +206,22 @@ export async function destroyStack(name) {
 }
 
 export async function getStackCompose(name) {
-  const fs = await import('fs');
-  const containers = await docker.listContainers({ all: true });
-  for (const c of containers) {
-    const info = await docker.getContainer(c.Id).inspect();
-    const labels = info.Config.Labels || {};
-    if (labels['com.docker.compose.project'] === name) {
-      const configFiles = labels['com.docker.compose.project.config_files'];
-      if (configFiles) {
-        try {
-          const paths = JSON.parse(configFiles);
-          for (const p of paths) {
-            try {
-              const content = await fs.promises.readFile(p, 'utf8');
-              return { content, path: p };
-            } catch {}
-          }
-        } catch {}
-      }
-    }
+  const { execSync } = await import('child_process');
+  try {
+    const content = execSync(`docker compose -p ${name} config`, { encoding: 'utf8', stdio: 'pipe' });
+    return { content };
+  } catch (err) {
+    throw new Error(`Cannot read compose config for stack "${name}": ${err.stderr || err.message}`);
   }
-  const fallbacks = [
-    `/tmp/stacks/${name}/docker-compose.yml`,
-    `/opt/stacks/${name}/compose.yaml`,
-    `/opt/stacks/${name}/docker-compose.yml`,
-  ];
-  for (const p of fallbacks) {
-    try {
-      const content = await fs.promises.readFile(p, 'utf8');
-      return { content, path: p };
-    } catch {}
-  }
-  throw new Error(`Compose file not found for stack "${name}"`);
 }
 
 export async function updateStackCompose(name, yaml) {
   const fs = await import('fs');
-  const { path } = await getStackCompose(name);
+  const dir = `/tmp/stacks/${name}`;
+  const path = `${dir}/docker-compose.yml`;
+  await fs.promises.mkdir(dir, { recursive: true });
   await fs.promises.writeFile(path, yaml);
   const { execSync } = await import('child_process');
-  execSync(`docker compose -p ${name} -f ${path} up -d`, { stdio: 'pipe' });
+  execSync(`docker compose -p ${name} -f ${path} up -d`, { cwd: dir, stdio: 'pipe' });
   return { success: true, name };
 }
