@@ -3,7 +3,6 @@ import { NavLink } from 'react-router-dom'
 import {
   Gauge,
   Container,
-  Layers,
   Image,
   HardDrive,
   Share2,
@@ -17,7 +16,6 @@ import { api } from '../lib/api'
 const links = [
   { to: '/', label: 'Dashboard', icon: Gauge },
   { to: '/containers', label: 'Containers', icon: Container },
-  { to: '/stacks', label: 'Stacks', icon: Layers },
   { to: '/images', label: 'Images', icon: Image },
   { to: '/volumes', label: 'Volumes', icon: HardDrive },
   { to: '/networks', label: 'Networks', icon: Share2 },

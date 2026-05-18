@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Image, Trash2, RefreshCw, Download, Plus, X } from 'lucide-react'
+import { Image, Trash2, RefreshCw, Download, Plus, X, Loader } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatBytes } from '../lib/utils'
 
@@ -9,6 +9,7 @@ export default function Images() {
   const [showPull, setShowPull] = useState(false)
   const [pullName, setPullName] = useState('')
   const [message, setMessage] = useState('')
+  const [pulling, setPulling] = useState({})
 
   const fetch = useCallback(async () => {
     try { setImages(await api.docker.images()) }
@@ -28,6 +29,18 @@ export default function Images() {
       setShowPull(false)
       fetch()
     } catch (err) { setMessage(err.message) }
+  }
+
+  const handlePullLatest = async (repo) => {
+    const name = `${repo}:latest`
+    setPulling((p) => ({ ...p, [name]: true }))
+    setMessage('')
+    try {
+      await api.docker.pullImage(name)
+      setMessage(`Pulled ${name}`)
+      fetch()
+    } catch (err) { setMessage(err.message) }
+    finally { setPulling((p) => { const n = { ...p }; delete n[name]; return n }) }
   }
 
   const handleRemove = async (id) => {
@@ -108,9 +121,25 @@ export default function Images() {
                     </td>
                     <td className="py-3 px-4 text-right text-surface-400">{formatBytes(img.size)}</td>
                     <td className="py-3 px-4 text-right">
-                      <button onClick={() => handleRemove(img.id)} className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remove">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="flex items-center justify-end gap-1">
+                        {!img.dangling && img.tags[0] && (
+                          <button
+                            onClick={() => handlePullLatest(img.tags[0].split(':')[0])}
+                            disabled={pulling[`${img.tags[0].split(':')[0]}:latest`]}
+                            className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50"
+                            title="Pull latest"
+                          >
+                            {pulling[`${img.tags[0].split(':')[0]}:latest`] ? (
+                              <Loader className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Download className="w-4 h-4" />
+                            )}
+                          </button>
+                        )}
+                        <button onClick={() => handleRemove(img.id)} className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remove">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

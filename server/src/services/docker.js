@@ -13,6 +13,7 @@ export async function listContainers() {
     status: c.Status,
     ports: c.Ports,
     created: c.Created,
+    composeProject: (c.Labels || {})['com.docker.compose.project'] || null,
   }));
 }
 
