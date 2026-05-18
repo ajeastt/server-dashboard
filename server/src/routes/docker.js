@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   listContainers, getContainer, getContainerStats, getContainerLogs, executeAction,
-  listStacks, deployStack, destroyStack,
+  listStacks, deployStack, destroyStack, getStackCompose, updateStackCompose,
   listImages, pullImage, removeImage, pruneImages,
   listVolumes, removeVolume, pruneVolumes,
   listNetworks, removeNetwork, pruneNetworks,
@@ -114,5 +114,15 @@ dockerRouter.post('/stacks', async (req, res) => {
 
 dockerRouter.delete('/stacks/:name', async (req, res) => {
   try { res.json(await destroyStack(req.params.name)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dockerRouter.get('/stacks/:name/compose', async (req, res) => {
+  try { res.json(await getStackCompose(req.params.name)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dockerRouter.put('/stacks/:name/compose', async (req, res) => {
+  try { res.json(await updateStackCompose(req.params.name, req.body.content)); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });

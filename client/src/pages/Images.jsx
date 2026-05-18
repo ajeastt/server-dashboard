@@ -89,14 +89,22 @@ export default function Images() {
               </thead>
               <tbody>
                 {images.map((img) => (
-                  <tr key={img.id} className="border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors">
+                  <tr key={img.id} className={`border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors ${img.dangling ? 'opacity-50' : ''}`}>
                     <td className="py-3 px-4 text-surface-200 font-medium">
-                      {img.tags[0]?.split(':')[0] || '<none>'}
+                      {img.dangling ? (
+                        <span className="text-amber-400">dangling</span>
+                      ) : (
+                        img.tags[0]?.split(':')[0] || '<none>'
+                      )}
                     </td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 text-xs rounded-md bg-surface-800 text-surface-400 font-mono">
-                        {img.tags[0]?.split(':')[1] || '<none>'}
-                      </span>
+                      {img.dangling ? (
+                        <span className="px-2 py-0.5 text-xs rounded-md bg-amber-500/10 text-amber-400 font-mono">—</span>
+                      ) : (
+                        <span className="px-2 py-0.5 text-xs rounded-md bg-surface-800 text-surface-400 font-mono">
+                          {img.tags[0]?.split(':')[1] || '<none>'}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-right text-surface-400">{formatBytes(img.size)}</td>
                     <td className="py-3 px-4 text-right">

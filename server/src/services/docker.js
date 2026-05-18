@@ -78,15 +78,13 @@ export async function createExec(id, cols = 80, rows = 24) {
 
 export async function listImages() {
   const images = await docker.listImages({ all: false });
-  return images
-    .filter((i) => i.RepoTags)
-    .map((i) => ({
-      id: i.Id.slice(7, 19),
-      tags: i.RepoTags,
-      size: i.Size,
-      created: i.Created,
-    }))
-    .sort((a, b) => b.created - a.created);
+  return images.map((i) => ({
+    id: i.Id.slice(7, 19),
+    tags: i.RepoTags || [],
+    dangling: !i.RepoTags || i.RepoTags.every((t) => t === '<none>:<none>'),
+    size: i.Size,
+    created: i.Created,
+  })).sort((a, b) => b.created - a.created);
 }
 
 export async function pullImage(name) {
@@ -204,5 +202,30 @@ export async function deployStack(name, composeYaml) {
 export async function destroyStack(name) {
   const { execSync } = await import('child_process');
   execSync(`docker compose -p ${name} down --volumes --remove-orphans`, { stdio: 'pipe' });
+  return { success: true, name };
+}
+
+export async function getStackCompose(name) {
+  const fs = await import('fs');
+  const paths = [
+    `/tmp/stacks/${name}/docker-compose.yml`,
+    `/opt/stacks/${name}/compose.yaml`,
+    `/opt/stacks/${name}/docker-compose.yml`,
+  ];
+  for (const p of paths) {
+    try {
+      const content = await fs.promises.readFile(p, 'utf8');
+      return { content, path: p };
+    } catch {}
+  }
+  throw new Error(`Compose file not found for stack "${name}"`);
+}
+
+export async function updateStackCompose(name, yaml) {
+  const fs = await import('fs');
+  const { path } = await getStackCompose(name);
+  await fs.promises.writeFile(path, yaml);
+  const { execSync } = await import('child_process');
+  execSync(`docker compose -p ${name} -f ${path} up -d`, { stdio: 'pipe' });
   return { success: true, name };
 }

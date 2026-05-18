@@ -27,6 +27,9 @@ export const api = {
       fetchJson('/docker/stacks', { method: 'POST', body: JSON.stringify({ name, compose }) }),
     destroyStack: (name) =>
       fetchJson(`/docker/stacks/${name}`, { method: 'DELETE' }),
+    stackCompose: (name) => fetchJson(`/docker/stacks/${name}/compose`),
+    updateStackCompose: (name, content) =>
+      fetchJson(`/docker/stacks/${name}/compose`, { method: 'PUT', body: JSON.stringify({ content }) }),
 
     images: () => fetchJson('/docker/images'),
     pullImage: (name) => fetchJson('/docker/images/pull', { method: 'POST', body: JSON.stringify({ name }) }),

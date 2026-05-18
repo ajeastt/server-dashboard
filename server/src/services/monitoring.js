@@ -4,13 +4,19 @@ let subscribers = [];
 let intervalId = null;
 
 async function collectMetrics() {
-  const [cpu, mem, disk, net, containers] = await Promise.all([
+  const results = await Promise.allSettled([
     si.currentLoad(),
     si.mem(),
     si.fsSize(),
     si.networkStats(),
     si.dockerContainers('all'),
   ]);
+
+  const cpu = results[0].status === 'fulfilled' ? results[0].value : { currentLoad: 0, cpus: [] };
+  const mem = results[1].status === 'fulfilled' ? results[1].value : { total: 0, used: 0, free: 0 };
+  const disk = results[2].status === 'fulfilled' ? results[2].value : [];
+  const net = results[3].status === 'fulfilled' ? results[3].value : [];
+  const containers = results[4].status === 'fulfilled' ? results[4].value : [];
 
   const networkStats = net.reduce(
     (acc, iface) => {
@@ -30,7 +36,7 @@ async function collectMetrics() {
       total: mem.total,
       used: mem.used,
       free: mem.free,
-      percent: Math.round((mem.used / mem.total) * 100 * 100) / 100,
+      percent: mem.total > 0 ? Math.round((mem.used / mem.total) * 100 * 100) / 100 : 0,
     },
     disk: disk.map((d) => ({
       fs: d.fs,
@@ -76,12 +82,10 @@ export function startMetricsStream(callback, interval = 2000) {
 }
 
 export async function getSystemInfo() {
-  const [osInfo, cpuInfo, memInfo, diskInfo, netInfo, timeInfo] = await Promise.all([
+  const [osInfo, cpuInfo, memInfo, timeInfo] = await Promise.all([
     si.osInfo(),
     si.cpu(),
     si.mem(),
-    si.fsSize(),
-    si.networkStats(),
     si.time(),
   ]);
 
