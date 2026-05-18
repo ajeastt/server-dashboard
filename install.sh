@@ -77,14 +77,21 @@ fi
 
 # ── Clone repo ──
 echo -e "  ${BLUE}→${NC} Cloning repository..."
-if [ -d "$INSTALL_DIR" ]; then
+if [ -d "$INSTALL_DIR/.git" ]; then
   echo -e "  ${BLUE}→${NC} Directory exists, updating..."
   cd "$INSTALL_DIR"
   sudo git pull
+elif [ -d "$INSTALL_DIR" ]; then
+  echo -e "  ${BLUE}→${NC} Directory exists but is not a git repo, replacing..."
+  sudo rm -rf "$INSTALL_DIR"
+  sudo git clone "$REPO_URL" "$INSTALL_DIR"
+  cd "$INSTALL_DIR"
 else
   sudo git clone "$REPO_URL" "$INSTALL_DIR"
   cd "$INSTALL_DIR"
 fi
+
+sudo git config --global --add safe.directory "$INSTALL_DIR" 2>/dev/null
 
 # ── Apply custom port ──
 if [[ "$PORT" != "3001" ]]; then
