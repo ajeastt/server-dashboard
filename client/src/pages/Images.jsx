@@ -49,8 +49,17 @@ export default function Images() {
 
   const handlePrune = async () => {
     if (!confirm('Remove all unused images?')) return
-    try { const r = await api.docker.pruneImages(); setMessage(`Pruned: reclaimed ${formatBytes(r.SpaceReclaimed || 0)}`); fetch() }
-    catch (err) { setMessage(err.message) }
+    try {
+      const r = await api.docker.pruneImages()
+      const reclaimed = r.SpaceReclaimed || 0
+      const inUse = images.filter((i) => i.dangling && i.usedBy?.length > 0).length
+      if (reclaimed === 0 && inUse > 0) {
+        setMessage(`${inUse} dangling image(s) are in use by running containers — stop them first, then prune.`)
+      } else {
+        setMessage(`Pruned: reclaimed ${formatBytes(reclaimed)}`)
+      }
+      fetch()
+    } catch (err) { setMessage(err.message) }
   }
 
   const handleCheckUpdate = async (repo) => {
@@ -92,6 +101,8 @@ export default function Images() {
         <div className={`p-3 rounded-lg border text-sm flex items-center justify-between ${
           message.toLowerCase().includes('error') || message.toLowerCase().includes('fail') || message.toLowerCase().includes('conflict') || message.toLowerCase().includes('in use')
             ? 'bg-red-500/10 border-red-500/20 text-red-400'
+            : message.toLowerCase().includes('reclaimed 0 b')
+            ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
             : 'bg-accent-500/10 border-accent-500/20 text-accent-400'
         }`}>
           <span>{message}</span>
