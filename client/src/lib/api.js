@@ -55,6 +55,12 @@ export function createWS() {
   const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
 
   const handlers = {};
+  const queue = [];
+
+  ws.onopen = () => {
+    queue.forEach((data) => ws.send(JSON.stringify(data)));
+    queue.length = 0;
+  };
 
   ws.onmessage = (event) => {
     try {
@@ -65,7 +71,13 @@ export function createWS() {
   };
 
   return {
-    send: (data) => { if (ws.readyState === ws.OPEN) ws.send(JSON.stringify(data)); },
+    send: (data) => {
+      if (ws.readyState === ws.OPEN) {
+        ws.send(JSON.stringify(data));
+      } else {
+        queue.push(data);
+      }
+    },
     on: (type, fn) => { handlers[type] = fn; },
     close: () => ws.close(),
     raw: ws,
