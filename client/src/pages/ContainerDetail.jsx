@@ -31,7 +31,6 @@ export default function ContainerDetail() {
     if (activeTab !== 'logs') return
     setLiveLogs('')
     const ws = createWS()
-    let reconnectTimer = null
 
     ws.on('log-data', (msg) => {
       setLiveLogs((prev) => {
@@ -42,13 +41,8 @@ export default function ContainerDetail() {
     ws.on('log-error', (msg) => {
       setLiveLogs(`[Error] ${msg.error}`)
     })
-    ws.on('log-end', () => {
-      reconnectTimer = setTimeout(() => {
-        ws.send({ type: 'logs', container: id })
-      }, 2000)
-    })
     ws.send({ type: 'logs', container: id })
-    return () => { clearTimeout(reconnectTimer); ws.send({ type: 'logs-stop' }); ws.close() }
+    return () => { ws.send({ type: 'logs-stop' }); ws.close() }
   }, [id, activeTab])
 
   // Auto-scroll logs

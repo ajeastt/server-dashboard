@@ -8,6 +8,7 @@ import (
 	"net"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 )
@@ -180,33 +181,6 @@ func handleWebSocket(c *websocket.Conn) {
 			logCancel = func() { close(cancel) }
 
 			go func() {
-				// Connect to Docker socket for log streaming
-				conn, err := net.Dial("unix", "/var/run/docker.sock")
-				if err != nil {
-					send(WSMessage{Type: "log-error", Error: err.Error()})
-					return
-				}
-				defer conn.Close()
-
-				req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=%s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-					containerID, tail)
-				conn.Write([]byte(req))
-
-				// Read headers
-				br := bufio.NewReader(conn)
-				for {
-					line, err := br.ReadString('\n')
-					if err != nil {
-						send(WSMessage{Type: "log-end"})
-						return
-					}
-					if strings.TrimSpace(line) == "" {
-						break
-					}
-				}
-
-				// Stream log data
-				buf := make([]byte, 4096)
 				for {
 					select {
 					case <-cancel:
@@ -214,21 +188,60 @@ func handleWebSocket(c *websocket.Conn) {
 					default:
 					}
 
-					n, err := br.Read(buf)
-					if n > 0 {
-						data := make([]byte, n)
-						copy(data, buf[:n])
-						cleaned := stripDockerHeaders(data)
-						if len(cleaned) > 0 {
-							send(map[string]interface{}{
-								"type": "log-data",
-								"data": string(cleaned),
-							})
+					conn, err := net.Dial("unix", "/var/run/docker.sock")
+					if err != nil {
+						send(WSMessage{Type: "log-error", Error: err.Error()})
+						return
+					}
+
+					req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=%s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+						containerID, tail)
+					conn.Write([]byte(req))
+
+					br := bufio.NewReader(conn)
+					for {
+						line, err := br.ReadString('\n')
+						if err != nil {
+							conn.Close()
+							break
+						}
+						if strings.TrimSpace(line) == "" {
+							break
 						}
 					}
-					if err != nil {
-						send(WSMessage{Type: "log-end"})
-						return
+
+					buf := make([]byte, 4096)
+					streamOk := true
+					for {
+						select {
+						case <-cancel:
+							conn.Close()
+							return
+						default:
+						}
+
+						n, err := br.Read(buf)
+						if n > 0 {
+							data := make([]byte, n)
+							copy(data, buf[:n])
+							cleaned := stripDockerHeaders(data)
+							if len(cleaned) > 0 {
+								send(map[string]interface{}{
+									"type": "log-data",
+									"data": string(cleaned),
+								})
+							}
+						}
+						if err != nil {
+							streamOk = false
+							conn.Close()
+							break
+						}
+					}
+
+					if !streamOk {
+						tail = "all"
+						time.Sleep(2 * time.Second)
 					}
 				}
 			}()
