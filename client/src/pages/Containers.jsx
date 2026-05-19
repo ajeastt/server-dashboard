@@ -16,6 +16,8 @@ export default function Containers() {
   const [stackName, setStackName] = useState('')
   const [composeYaml, setComposeYaml] = useState('')
   const [deploying, setDeploying] = useState(false)
+  const [validating, setValidating] = useState(false)
+  const [validMsg, setValidMsg] = useState(null)
   const [error, setError] = useState('')
 
   const [editStack, setEditStack] = useState(null)
@@ -72,11 +74,32 @@ export default function Containers() {
     setExpandedStacks((prev) => ({ ...prev, [name]: !prev[name] }))
   }
 
+  const handleValidate = async () => {
+    const yaml = editStack ? editYaml : composeYaml
+    if (!yaml) return
+    setValidating(true)
+    setValidMsg(null)
+    setError('')
+    try {
+      const result = await api.docker.validateCompose(yaml)
+      if (result.valid) {
+        setValidMsg({ type: 'success', text: 'Valid compose file' })
+      } else {
+        setValidMsg({ type: 'error', text: result.error })
+      }
+    } catch (err) {
+      setValidMsg({ type: 'error', text: err.message })
+    } finally {
+      setValidating(false)
+    }
+  }
+
   const handleDeploy = async (e) => {
     e.preventDefault()
     if (!stackName || !composeYaml) return
     setDeploying(true)
     setError('')
+    setValidMsg(null)
     try {
       await api.docker.deployStack(stackName, composeYaml)
       setShowDeploy(false)
@@ -119,6 +142,7 @@ export default function Containers() {
     setEditYaml('')
     setEditLoading(true)
     setError('')
+    setValidMsg(null)
     try {
       const { content } = await api.docker.stackCompose(name)
       setEditYaml(content)
@@ -292,7 +316,7 @@ export default function Containers() {
                   <p className="text-xs text-surface-500">Paste your docker-compose.yml below</p>
                 </div>
               </div>
-              <button onClick={() => { setShowDeploy(false); setError('') }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
+              <button onClick={() => { setShowDeploy(false); setError(''); setValidMsg(null) }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -305,9 +329,17 @@ export default function Containers() {
                 <label className="block text-xs font-medium text-surface-400 mb-1.5">docker-compose.yml</label>
                 <textarea value={composeYaml} onChange={(e) => setComposeYaml(e.target.value)} placeholder={`services:\n  app:\n    image: nginx:latest\n    ports:\n      - "80:80"`} rows={12} className="w-full px-3 py-2 text-sm rounded-lg border border-surface-700 bg-surface-850 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all font-mono resize-none" required />
               </div>
+              {validMsg && (
+                <div className={`p-3 rounded-lg border text-sm ${
+                  validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                }`}>
+                  {validMsg.text}
+                </div>
+              )}
               {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">{error}</div>}
               <div className="flex justify-end gap-3 pt-2">
-                <button type="button" onClick={() => { setShowDeploy(false); setError('') }} className="px-4 py-2 text-sm font-medium rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-all">Cancel</button>
+                <button type="button" onClick={() => { setShowDeploy(false); setError(''); setValidMsg(null) }} className="px-4 py-2 text-sm font-medium rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-all">Cancel</button>
+                <button type="button" onClick={handleValidate} disabled={validating || !composeYaml} className="px-4 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all disabled:opacity-50">{validating ? 'Validating...' : 'Validate'}</button>
                 <button type="submit" disabled={deploying} className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">{deploying ? 'Deploying...' : 'Deploy'}</button>
               </div>
             </form>
@@ -336,7 +368,7 @@ export default function Containers() {
                   <p className="text-xs text-surface-500">Edit docker-compose.yml and redeploy</p>
                 </div>
               </div>
-              <button onClick={() => { setEditStack(null); setError('') }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
+              <button onClick={() => { setEditStack(null); setError(''); setValidMsg(null) }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
                 <X className="w-4 h-4" />
               </button>
             </div>
@@ -347,9 +379,17 @@ export default function Containers() {
             ) : (
               <form onSubmit={handleSave} className="p-5 space-y-4">
                 <textarea value={editYaml} onChange={(e) => setEditYaml(e.target.value)} rows={18} className="w-full px-3 py-2 text-sm rounded-lg border border-surface-700 bg-surface-850 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all font-mono resize-none" required />
+                {validMsg && (
+                  <div className={`p-3 rounded-lg border text-sm ${
+                    validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
+                  }`}>
+                    {validMsg.text}
+                  </div>
+                )}
                 {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">{error}</div>}
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => { setEditStack(null); setError('') }} className="px-4 py-2 text-sm font-medium rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-all">Cancel</button>
+                  <button type="button" onClick={() => { setEditStack(null); setError(''); setValidMsg(null) }} className="px-4 py-2 text-sm font-medium rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-all">Cancel</button>
+                  <button type="button" onClick={handleValidate} disabled={validating || !editYaml} className="px-4 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all disabled:opacity-50">{validating ? 'Validating...' : 'Validate'}</button>
                   <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Saving & Redeploying...' : 'Save & Redeploy'}</button>
                 </div>
               </form>

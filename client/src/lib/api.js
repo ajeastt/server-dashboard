@@ -31,6 +31,8 @@ export const api = {
       fetchJson(`/docker/stacks/${name}/restart`, { method: 'POST' }),
     updateStack: (name) =>
       fetchJson(`/docker/stacks/${name}/update`, { method: 'POST' }),
+    validateCompose: (content) =>
+      fetchJson('/docker/stacks/validate', { method: 'POST', body: JSON.stringify({ content }) }),
     stackCompose: (name) => fetchJson(`/docker/stacks/${name}/compose`),
     updateStackCompose: (name, content) =>
       fetchJson(`/docker/stacks/${name}/compose`, { method: 'PUT', body: JSON.stringify({ content }) }),

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   listContainers, getContainer, getContainerStats, getContainerLogs, executeAction,
-  listStacks, deployStack, restartStack, destroyStack, getStackCompose, updateStackCompose, updateStackImages, updateStackImagesStream,
+  listStacks, deployStack, restartStack, destroyStack, getStackCompose, updateStackCompose, updateStackImages, updateStackImagesStream, validateCompose,
   listImages, pullImage, pullImageStream, checkImageUpdate, removeImage, pruneImages,
   listVolumes, removeVolume, pruneVolumes,
   listNetworks, removeNetwork, pruneNetworks,
@@ -126,6 +126,11 @@ dockerRouter.post('/prune', async (req, res) => {
 });
 
 // ── Stacks ──
+
+dockerRouter.post('/stacks/validate', async (req, res) => {
+  try { res.json(await validateCompose(req.body.content)); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 dockerRouter.get('/stacks', async (req, res) => {
   try { res.json(await listStacks()); }

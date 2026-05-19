@@ -282,6 +282,26 @@ export async function systemPrune() {
   return result;
 }
 
+// ── Validation ──
+
+export async function validateCompose(yaml) {
+  const fs = await import('fs');
+  const tmpDir = `/tmp/stacks/_validate_${Date.now()}`;
+  const tmpPath = `${tmpDir}/docker-compose.yml`;
+  await fs.promises.mkdir(tmpDir, { recursive: true });
+  await fs.promises.writeFile(tmpPath, yaml);
+  const { execSync } = await import('child_process');
+  try {
+    execSync(`docker compose -f "${tmpPath}" config --quiet`, { stdio: 'pipe', timeout: 15000 });
+    return { valid: true };
+  } catch (err) {
+    const msg = (err.stderr || err.message || '').toString().trim();
+    return { valid: false, error: msg || 'Invalid compose file' };
+  } finally {
+    await fs.promises.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+  }
+}
+
 // ── Stacks ──
 
 export async function listStacks() {
