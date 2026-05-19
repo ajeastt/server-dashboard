@@ -24,6 +24,8 @@ const links = [
 export default function Sidebar() {
   const [pruning, setPruning] = useState(false)
   const [done, setDone] = useState(false)
+  const [pruningImages, setPruningImages] = useState(false)
+  const [imagesDone, setImagesDone] = useState(false)
 
   const handlePrune = async () => {
     if (!confirm('Run docker system prune? This removes unused containers, images, networks, and build cache.')) return
@@ -36,6 +38,20 @@ export default function Sidebar() {
       console.error(err)
     } finally {
       setPruning(false)
+    }
+  }
+
+  const handlePruneImages = async () => {
+    if (!confirm('Remove unused Docker images?')) return
+    setPruningImages(true)
+    try {
+      await api.docker.pruneImages()
+      setImagesDone(true)
+      setTimeout(() => setImagesDone(false), 3000)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setPruningImages(false)
     }
   }
 
@@ -71,6 +87,21 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-3 border-t border-surface-800 space-y-2">
+        <button
+          onClick={handlePruneImages}
+          disabled={pruningImages}
+          className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all disabled:opacity-50
+            bg-surface-800/50 text-surface-400 hover:text-surface-200 hover:bg-surface-800"
+        >
+          {pruningImages ? (
+            <Loader className="w-3.5 h-3.5 animate-spin" />
+          ) : imagesDone ? (
+            <Check className="w-3.5 h-3.5 text-emerald-400" />
+          ) : (
+            <Eraser className="w-3.5 h-3.5" />
+          )}
+          <span className="hidden lg:block">{pruningImages ? 'Pruning...' : imagesDone ? 'Done' : 'Prune Images'}</span>
+        </button>
         <button
           onClick={handlePrune}
           disabled={pruning}
