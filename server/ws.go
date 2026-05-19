@@ -170,9 +170,9 @@ func handleWebSocket(c *websocket.Conn) {
 				logCancel = nil
 			}
 
-			tail := msg.Tail
-			if tail == 0 {
-				tail = 50
+			tail := "all"
+			if msg.Tail > 0 {
+				tail = fmt.Sprintf("%d", msg.Tail)
 			}
 
 			containerID := msg.Container
@@ -188,7 +188,7 @@ func handleWebSocket(c *websocket.Conn) {
 				}
 				defer conn.Close()
 
-				req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=%d HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+				req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=%s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
 					containerID, tail)
 				conn.Write([]byte(req))
 

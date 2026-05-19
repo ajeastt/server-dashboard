@@ -319,8 +319,8 @@ func getContainerStats(id string) (*StatsResp, error) {
 	}, nil
 }
 
-func getContainerLogs(id string, tail int) (string, error) {
-	resp, err := httpDocker.Get(fmt.Sprintf("http://localhost/containers/%s/logs?stdout=true&stderr=true&tail=%d", id, tail))
+func getContainerLogs(id string, tail string) (string, error) {
+	resp, err := httpDocker.Get(fmt.Sprintf("http://localhost/containers/%s/logs?stdout=true&stderr=true&tail=%s", id, tail))
 	if err != nil {
 		return "", err
 	}

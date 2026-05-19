@@ -40,7 +40,7 @@ export default function ContainerDetail() {
     ws.on('log-error', (msg) => {
       setLiveLogs(`[Error] ${msg.error}`)
     })
-    ws.send({ type: 'logs', container: id, tail: 50 })
+    ws.send({ type: 'logs', container: id })
     return () => { ws.send({ type: 'logs-stop' }); ws.close() }
   }, [id, activeTab])
 

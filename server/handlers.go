@@ -62,7 +62,10 @@ func handleContainerStats(c *fiber.Ctx) error {
 }
 
 func handleContainerLogs(c *fiber.Ctx) error {
-	tail := parseInt(c.Query("tail"), 100)
+	tail := c.Query("tail")
+	if tail == "" {
+		tail = "all"
+	}
 	logs, err := getContainerLogs(c.Params("id"), tail)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
