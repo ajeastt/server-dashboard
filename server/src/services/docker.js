@@ -44,8 +44,38 @@ export async function getContainerStats(id) {
 
 export async function getContainerLogs(id, tail = 100) {
   const container = docker.getContainer(id);
-  const logs = await container.logs({ stdout: true, stderr: true, tail, timestamps: false });
-  return logs.toString('utf8');
+  const logStream = await container.logs({ stdout: true, stderr: true, tail, timestamps: false });
+  return stripDockerHeaders(logStream);
+}
+
+function stripDockerHeaders(buf) {
+  const lines = [];
+  let offset = 0;
+  const data = Buffer.isBuffer(buf) ? buf : Buffer.from(buf);
+  while (offset < data.length) {
+    if (offset + 8 > data.length) break;
+    const payloadLen = data.readUInt32BE(4 + offset);
+    if (offset + 8 + payloadLen > data.length) break;
+    lines.push(data.slice(offset + 8, offset + 8 + payloadLen).toString('utf8'));
+    offset += 8 + payloadLen;
+  }
+  return lines.join('');
+}
+
+export async function streamContainerLogs(id, tail = 50) {
+  const container = docker.getContainer(id);
+  const logStream = await container.logs({
+    follow: true,
+    stdout: true,
+    stderr: true,
+    tail,
+    timestamps: false,
+  });
+  const { PassThrough } = await import('stream');
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  container.modem.demuxStream(logStream, stdout, stderr);
+  return { logStream, stdout, stderr };
 }
 
 export async function executeAction(id, action) {

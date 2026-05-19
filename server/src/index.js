@@ -8,7 +8,7 @@ import { dockerRouter } from './routes/docker.js';
 import { systemRouter } from './routes/system.js';
 import { monitoringRouter } from './routes/monitoring.js';
 import { startMetricsStream } from './services/monitoring.js';
-import { createExec, getContainer } from './services/docker.js';
+import { createExec, streamContainerLogs } from './services/docker.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -115,18 +115,14 @@ wss.on('connection', (ws) => {
           logStream = null;
         }
         try {
-          const container = await getContainer(msg.container);
-          logStream = await container.logs({
-            follow: true,
-            stdout: true,
-            stderr: true,
-            tail: msg.tail || 50,
-            timestamps: false,
-          });
-          logStream.on('data', (chunk) => {
+          const { logStream: ls, stdout, stderr } = await streamContainerLogs(msg.container, msg.tail || 50);
+          logStream = ls;
+          const sendLog = (chunk) => {
             const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
-            send({ type: 'log-data', data: buf.toString('utf8') });
-          });
+            if (buf.length > 0) send({ type: 'log-data', data: buf.toString('utf8') });
+          };
+          stdout.on('data', sendLog);
+          stderr.on('data', sendLog);
           logStream.on('end', () => send({ type: 'log-end' }));
         } catch (err) {
           send({ type: 'log-error', error: err.message });

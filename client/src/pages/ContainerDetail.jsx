@@ -37,6 +37,9 @@ export default function ContainerDetail() {
         return next.length > 50000 ? next.slice(-50000) : next
       })
     })
+    ws.on('log-error', (msg) => {
+      setLiveLogs(`[Error] ${msg.error}`)
+    })
     ws.send({ type: 'logs', container: id, tail: 50 })
     return () => { ws.send({ type: 'logs-stop' }); ws.close() }
   }, [id, activeTab])
