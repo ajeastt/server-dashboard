@@ -55,7 +55,6 @@ func (u *unifiClient) tryLogin(prefix string) bool {
 
 func (u *unifiClient) login() error {
 	if u.apiPrefix != "" {
-		// Already detected, just re-login
 		body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
 		req, _ := http.NewRequest("POST", u.baseURL+u.apiPrefix+"/login", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
@@ -65,21 +64,47 @@ func (u *unifiClient) login() error {
 		}
 		defer resp.Body.Close()
 		if resp.StatusCode != 200 {
-			return fmt.Errorf("login: status %d", resp.StatusCode)
+			body, _ := io.ReadAll(resp.Body)
+			return fmt.Errorf("login failed (HTTP %d): %s", resp.StatusCode, string(body))
 		}
 		return nil
 	}
 
+	// First check if the host is reachable at all
+	testReq, err := http.NewRequest("GET", u.baseURL+"/", nil)
+	if err == nil {
+		testResp, testErr := u.client.Do(testReq)
+		if testErr != nil {
+			return fmt.Errorf("cannot reach %s: %v", u.baseURL, testErr)
+		}
+		testResp.Body.Close()
+	}
+
 	// Auto-detect API path: try classic first, then UniFi OS proxy path
-	if u.tryLogin("/api") {
-		u.apiPrefix = "/api"
-		return nil
+	attempts := []struct {
+		prefix string
+		label  string
+	}{{"/api", "classic"}, {"/proxy/network/api", "UniFi OS"}}
+
+	for _, a := range attempts {
+		body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
+		req, _ := http.NewRequest("POST", u.baseURL+a.prefix+"/login", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := u.client.Do(req)
+		if err != nil {
+			continue
+		}
+		if resp.StatusCode == 200 {
+			u.apiPrefix = a.prefix
+			resp.Body.Close()
+			return nil
+		}
+		resp.Body.Close()
+		if resp.StatusCode == 401 {
+			return fmt.Errorf("wrong username or password (tried %s API at %s%s/login)", a.label, u.baseURL, a.prefix)
+		}
 	}
-	if u.tryLogin("/proxy/network/api") {
-		u.apiPrefix = "/proxy/network/api"
-		return nil
-	}
-	return fmt.Errorf("login failed: could not reach UniFi controller")
+	return fmt.Errorf("could not find UniFi API at %s (tried /api and /proxy/network/api)", u.baseURL)
 }
 
 func (u *unifiClient) get(path string) ([]byte, error) {

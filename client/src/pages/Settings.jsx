@@ -6,12 +6,14 @@ export default function Settings() {
   const [config, setConfig] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testing, setTesting] = useState(false)
   const [error, setError] = useState(null)
   const [success, setSuccess] = useState(null)
 
   const [url, setUrl] = useState('')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
+  const [testResult, setTestResult] = useState(null)
 
   useEffect(() => {
     api.config.get().then((cfg) => {
@@ -22,11 +24,32 @@ export default function Settings() {
     }).catch(() => {}).finally(() => setLoading(false))
   }, [])
 
+  const handleTest = async () => {
+    if (!url || !username || !password) return
+    setTesting(true)
+    setTestResult(null)
+    setError(null)
+
+    const cleanUrl = url.replace(/\/+$/, '')
+    try {
+      await api.config.save({
+        unifi: { url: cleanUrl, username, password },
+      })
+      const health = await api.widgets.unifi.health()
+      setTestResult({ ok: true, message: `Connected! ${health.num_clients} clients, internet: ${health.internet}` })
+    } catch (err) {
+      setTestResult({ ok: false, message: err.message })
+    } finally {
+      setTesting(false)
+    }
+  }
+
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
     setSuccess(null)
+    setTestResult(null)
 
     const cleanUrl = url.replace(/\/+$/, '')
     try {
@@ -157,14 +180,37 @@ export default function Settings() {
                 className="w-full px-3 py-2 rounded-lg bg-surface-800 border border-surface-700 text-surface-200 text-sm placeholder-surface-500 focus:outline-none focus:ring-2 focus:ring-accent-500/50 focus:border-accent-500"
               />
             </div>
-            <button
-              type="submit"
-              disabled={saving || !url || !username || !password}
-              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
-            >
-              {saving ? <Loader className="w-4 h-4 animate-spin" /> : null}
-              {saving ? 'Saving...' : 'Save'}
-            </button>
+
+            {testResult && (
+              <div className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm ${
+                testResult.ok
+                  ? 'bg-emerald-500/10 border border-emerald-500/20 text-emerald-400'
+                  : 'bg-red-500/10 border border-red-500/20 text-red-400'
+              }`}>
+                {testResult.ok ? <Check className="w-4 h-4 shrink-0" /> : <AlertCircle className="w-4 h-4 shrink-0" />}
+                {testResult.message}
+              </div>
+            )}
+
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={handleTest}
+                disabled={testing || !url || !username || !password}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-surface-700 hover:bg-surface-600 disabled:opacity-50 disabled:cursor-not-allowed text-surface-200 text-sm font-medium transition-colors"
+              >
+                {testing ? <Loader className="w-4 h-4 animate-spin" /> : null}
+                {testing ? 'Testing...' : 'Test Connection'}
+              </button>
+              <button
+                type="submit"
+                disabled={saving || !url || !username || !password}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-500 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-medium transition-colors"
+              >
+                {saving ? <Loader className="w-4 h-4 animate-spin" /> : null}
+                {saving ? 'Saving...' : 'Save'}
+              </button>
+            </div>
           </form>
         )}
       </div>
