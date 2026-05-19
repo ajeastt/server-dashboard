@@ -394,35 +394,44 @@ func handleStackUpdateStream(c *fiber.Ctx) error {
 		return nil
 	}
 
-	runCmd := func(args []string, phase string) error {
+	streamCmd := func(args []string) (bool, error) {
 		cmd := exec.Command("docker", append([]string{"compose", "-p", name}, args...)...)
 		cmd.Dir = dir
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
 		if err := cmd.Start(); err != nil {
-			return err
+			return false, err
 		}
 
 		reader := io.MultiReader(stdout, stderr)
 		scanner := bufio.NewScanner(reader)
+		pulled := false
 		for scanner.Scan() {
 			line := scanner.Text()
+			if strings.Contains(line, "Downloaded newer image") {
+				pulled = true
+			}
 			if err := sse.Event("", fiber.Map{"stream": line + "\n"}); err != nil {
 				cmd.Process.Kill()
-				return err
+				return pulled, err
 			}
 		}
-		if phase != "" {
-			sse.Event("phase", fiber.Map{"phase": phase})
-		}
-		return cmd.Wait()
+		return pulled, cmd.Wait()
 	}
 
-	if err := runCmd([]string{"pull"}, ""); err != nil {
+	pulled, err := streamCmd([]string{"pull"})
+	if err != nil {
 		sse.Error(err.Error())
 		return nil
 	}
-	if err := runCmd([]string{"up", "-d"}, "up"); err != nil {
+	if !pulled {
+		sse.Event("no-update", fiber.Map{})
+		sse.Done()
+		return nil
+	}
+	sse.Event("phase", fiber.Map{"phase": "up"})
+	_, err = streamCmd([]string{"up", "-d"})
+	if err != nil {
 		sse.Error(err.Error())
 		return nil
 	}

@@ -1,11 +1,24 @@
 import { useState, useEffect, useRef } from 'react'
-import { Terminal, X, CheckCircle, AlertCircle, Loader } from 'lucide-react'
+import { X, CheckCircle, AlertCircle, Loader } from 'lucide-react'
 
 export default function StackUpdateModal({ name, onClose, onDone }) {
   const [lines, setLines] = useState([])
   const [status, setStatus] = useState('updating')
   const [phase, setPhase] = useState('pull')
   const endRef = useRef(null)
+  const bufRef = useRef([])
+  const timerRef = useRef(null)
+  const closeTimerRef = useRef(null)
+
+  useEffect(() => {
+    timerRef.current = setInterval(() => {
+      if (bufRef.current.length > 0) {
+        setLines((prev) => [...prev, ...bufRef.current])
+        bufRef.current = []
+      }
+    }, 40)
+    return () => clearInterval(timerRef.current)
+  }, [])
 
   useEffect(() => {
     const es = new EventSource(`/api/docker/stacks/${encodeURIComponent(name)}/update-stream`)
@@ -15,7 +28,7 @@ export default function StackUpdateModal({ name, onClose, onDone }) {
         const obj = JSON.parse(e.data)
         if (obj.stream) {
           const textLines = obj.stream.split('\n').filter(Boolean)
-          setLines((prev) => [...prev, ...textLines.map((t) => ({ text: t, type: 'output' }))])
+          bufRef.current.push(...textLines.map((t) => ({ text: t, type: 'output' })))
         }
       } catch {}
     }
@@ -23,33 +36,51 @@ export default function StackUpdateModal({ name, onClose, onDone }) {
     es.addEventListener('phase', (e) => {
       const d = JSON.parse(e.data)
       setPhase(d.phase)
-      setLines((prev) => [...prev, { text: d.phase === 'up' ? '--- Restarting services ---' : '', type: 'phase' }])
+      bufRef.current.push({ text: '--- Restarting services ---', type: 'phase' })
+    })
+
+    es.addEventListener('no-update', () => {
+      clearInterval(timerRef.current)
+      setLines((prev) => [...prev, ...bufRef.current, { text: 'All images already up to date', type: 'done' }])
+      bufRef.current = []
+      setStatus('done')
+      es.close()
+      closeTimerRef.current = setTimeout(() => { if (onDone) onDone() }, 1500)
     })
 
     es.addEventListener('done', () => {
-      setLines((prev) => [...prev, { text: 'Stack updated successfully', type: 'done' }])
+      clearInterval(timerRef.current)
+      setLines((prev) => [...prev, ...bufRef.current, { text: 'Stack updated successfully', type: 'done' }])
+      bufRef.current = []
       setStatus('done')
       es.close()
       if (onDone) onDone()
     })
 
     es.addEventListener('error', (e) => {
+      clearInterval(timerRef.current)
       let msg = 'Update failed'
       try { const d = JSON.parse(e.data); msg = d.error || msg } catch {}
-      setLines((prev) => [...prev, { text: msg, type: 'error' }])
+      setLines((prev) => [...prev, ...bufRef.current, { text: msg, type: 'error' }])
+      bufRef.current = []
       setStatus('error')
       es.close()
     })
 
     es.onerror = () => {
       if (status === 'updating') {
-        setLines((prev) => [...prev, { text: 'Connection lost', type: 'error' }])
+        clearInterval(timerRef.current)
+        setLines((prev) => [...prev, ...bufRef.current, { text: 'Connection lost', type: 'error' }])
+        bufRef.current = []
         setStatus('error')
         es.close()
       }
     }
 
-    return () => { es.close() }
+    return () => {
+      es.close()
+      clearTimeout(closeTimerRef.current)
+    }
   }, [name])
 
   useEffect(() => {
@@ -72,7 +103,8 @@ export default function StackUpdateModal({ name, onClose, onDone }) {
             </div>
             <div>
               <h2 className="text-sm font-semibold text-surface-200">
-                {phase === 'up' ? 'Restarting services...' : 'Updating images...'}
+                {status === 'done' && phase === 'pull' ? 'Already up to date' :
+                 phase === 'up' ? 'Restarting services...' : 'Updating images...'}
               </h2>
               <p className="text-xs text-surface-500">
                 {status === 'done' ? 'Complete' : status === 'error' ? 'Failed' : 'Stack: ' + name}
