@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader, Download, Check, Play, Square } from 'lucide-react'
 import { api } from '../lib/api'
-import { stateColor } from '../lib/utils'
 import StackUpdateModal from '../components/StackUpdateModal'
 
 export default function Containers() {
@@ -187,7 +186,7 @@ export default function Containers() {
 
   const statusDot = (state) => {
     const colors = { running: 'bg-emerald-400', paused: 'bg-amber-400', exited: 'bg-red-400', stopped: 'bg-red-400' }
-    return <span className={`w-2 h-2 rounded-full inline-block ${colors[state] || 'bg-surface-500'}`} />
+    return <span className={`w-2 h-2 rounded-full inline-block ${colors[state] || 'bg-surface-400'}`} />
   }
 
   return (
@@ -208,8 +207,8 @@ export default function Containers() {
       {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
-          <input type="text" placeholder="Search containers..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-surface-800 bg-surface-900 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+          <input type="text" placeholder="Search containers..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-surface-800 bg-surface-900 text-surface-200 placeholder-surface-400 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all" />
         </div>
         <div className="flex gap-1.5">
           {['all', 'running', 'exited', 'paused'].map((f) => (
@@ -247,7 +246,7 @@ export default function Containers() {
                         {stack.status}
                       </span>
                     )}
-                    <span className="text-xs text-surface-500">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
+                    <span className="text-xs text-surface-400">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => setUpdateStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Update images">
@@ -265,45 +264,39 @@ export default function Containers() {
                   </div>
                 </div>
 
-                {/* Container table */}
+                {/* Container rows */}
                 {expanded && ctrs.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <tbody className="divide-y divide-surface-800/50">
-                        {ctrs.map((c) => (
-                          <tr key={c.id} className="hover:bg-surface-800/30 transition-all">
-                            <td className="px-4 py-3 w-6">{statusDot(c.state)}</td>
-                            <td className="px-2 py-3">
-                              <Link to={`/containers/${c.id}`} className="text-surface-200 font-medium hover:text-accent-400 transition-colors">
-                                {c.name}
-                              </Link>
-                            </td>
-                            <td className="px-3 py-3 text-surface-500 truncate max-w-[200px] hidden md:table-cell">{c.image}</td>
-                            <td className="px-3 py-3 text-surface-500 text-xs font-mono truncate max-w-[200px] hidden lg:table-cell">{formatPorts(c.ports)}</td>
-                            <td className="px-3 py-3 text-surface-400 text-xs whitespace-nowrap">{c.status}</td>
-                            <td className="px-3 py-3 w-24">
-                              <div className="flex items-center gap-0.5">
-                                {c.state === 'running' ? (
-                                  <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
-                                    {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
-                                  </button>
-                                ) : (
-                                  <button onClick={() => handleAction(c.id, 'start')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all disabled:opacity-50" title="Start">
-                                    {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                                  </button>
-                                )}
-                                <button onClick={() => handleAction(c.id, 'restart')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Restart">
-                                  <RefreshCw className="w-3.5 h-3.5" />
-                                </button>
-                                <Link to={`/containers/${c.id}`} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Details / Logs">
-                                  <Terminal className="w-3.5 h-3.5" />
-                                </Link>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div>
+                    {ctrs.map((c) => (
+                      <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-800/30 transition-all border-b border-white/[0.04]">
+                        <div className="shrink-0">{statusDot(c.state)}</div>
+                        <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
+                          <div className="text-sm font-medium text-surface-200 hover:text-accent-400 transition-colors truncate">{c.name}</div>
+                          <div className="text-xs text-surface-400 truncate">{c.image}</div>
+                        </Link>
+                        <div className="flex items-center gap-3 shrink-0">
+                          <span className="text-xs text-surface-400 font-mono hidden md:block">{formatPorts(c.ports)}</span>
+                          <span className="text-xs text-surface-400 whitespace-nowrap">{c.status}</span>
+                          <div className="flex items-center gap-0.5">
+                            {c.state === 'running' ? (
+                              <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-400 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
+                                {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
+                              </button>
+                            ) : (
+                              <button onClick={() => handleAction(c.id, 'start')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all disabled:opacity-50" title="Start">
+                                {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                            <button onClick={() => handleAction(c.id, 'restart')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-400 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Restart">
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                            <Link to={`/containers/${c.id}`} className="p-1.5 rounded text-surface-400 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Details / Logs">
+                              <Terminal className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -318,43 +311,37 @@ export default function Containers() {
                 <h2 className="text-sm font-semibold text-surface-400 tracking-wide">Standalone</h2>
                 <span className="text-xs text-surface-600">{standalone.length}</span>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <tbody className="divide-y divide-surface-800/50">
-                    {standalone.map((c) => (
-                      <tr key={c.id} className="hover:bg-surface-800/30 transition-all">
-                        <td className="px-4 py-3 w-6">{statusDot(c.state)}</td>
-                        <td className="px-2 py-3">
-                          <Link to={`/containers/${c.id}`} className="text-surface-200 font-medium hover:text-accent-400 transition-colors">
-                            {c.name}
-                          </Link>
-                        </td>
-                        <td className="px-3 py-3 text-surface-500 truncate max-w-[200px] hidden md:table-cell">{c.image}</td>
-                        <td className="px-3 py-3 text-surface-500 text-xs font-mono truncate max-w-[200px] hidden lg:table-cell">{formatPorts(c.ports)}</td>
-                        <td className="px-3 py-3 text-surface-400 text-xs whitespace-nowrap">{c.status}</td>
-                        <td className="px-3 py-3 w-24">
-                          <div className="flex items-center gap-0.5">
-                            {c.state === 'running' ? (
-                              <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
-                                {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
-                              </button>
-                            ) : (
-                              <button onClick={() => handleAction(c.id, 'start')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all disabled:opacity-50" title="Start">
-                                {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-                              </button>
-                            )}
-                            <button onClick={() => handleAction(c.id, 'restart')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Restart">
-                              <RefreshCw className="w-3.5 h-3.5" />
-                            </button>
-                            <Link to={`/containers/${c.id}`} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Details / Logs">
-                              <Terminal className="w-3.5 h-3.5" />
-                            </Link>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+              <div>
+                {standalone.map((c) => (
+                  <div key={c.id} className="flex items-center gap-3 px-4 py-2.5 hover:bg-surface-800/30 transition-all border-b border-white/[0.04]">
+                    <div className="shrink-0">{statusDot(c.state)}</div>
+                    <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-surface-200 hover:text-accent-400 transition-colors truncate">{c.name}</div>
+                      <div className="text-xs text-surface-400 truncate">{c.image}</div>
+                    </Link>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-xs text-surface-400 font-mono hidden md:block">{formatPorts(c.ports)}</span>
+                      <span className="text-xs text-surface-400 whitespace-nowrap">{c.status}</span>
+                      <div className="flex items-center gap-0.5">
+                        {c.state === 'running' ? (
+                          <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-400 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
+                            {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
+                          </button>
+                        ) : (
+                          <button onClick={() => handleAction(c.id, 'start')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-400 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all disabled:opacity-50" title="Start">
+                            {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                        <button onClick={() => handleAction(c.id, 'restart')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-400 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Restart">
+                          <RefreshCw className="w-3.5 h-3.5" />
+                        </button>
+                        <Link to={`/containers/${c.id}`} className="p-1.5 rounded text-surface-400 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Details / Logs">
+                          <Terminal className="w-3.5 h-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
