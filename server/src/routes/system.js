@@ -16,11 +16,17 @@ systemRouter.get('/info', async (req, res) => {
 
 systemRouter.get('/disks', async (req, res) => {
   try {
-    const hostRoot = '/host';
-    const mountsFile = `${hostRoot}/proc/mounts`;
-    const hasHost = await import('fs').then((fs) => fs.promises.access(mountsFile).then(() => true).catch(() => false));
+    let dfOutput;
+    try {
+      dfOutput = execSync(
+        'docker run --rm --pid=host alpine nsenter -t 1 -m df -B1 --output=source,target,size,used,avail,pcent 2>/dev/null',
+        { encoding: 'utf8', timeout: 15000 }
+      );
+    } catch {
+      dfOutput = null;
+    }
 
-    if (!hasHost) {
+    if (!dfOutput) {
       const all = await si.fsSize();
       const physical = all.filter((d) => d.fs.startsWith('/dev/') && !d.fs.startsWith('/dev/loop'));
       const seen = {};
@@ -32,32 +38,24 @@ systemRouter.get('/disks', async (req, res) => {
       return res.json(Object.values(seen));
     }
 
-    const mounts = await import('fs').then((fs) => fs.promises.readFile(mountsFile, 'utf8'));
+    const lines = dfOutput.trim().split('\n').slice(1);
     const seen = {};
 
-    for (const line of mounts.split('\n')) {
-      const parts = line.split(/\s+/);
-      const device = parts[0];
-      const mountPoint = parts[1]?.replace(/\\040/g, ' ');
-      if (!device || !mountPoint || !device.startsWith('/dev/') || device.startsWith('/dev/loop')) continue;
-      if (mountPoint.startsWith('/host')) continue;
+    for (const line of lines) {
+      const cols = line.trim().split(/\s+/);
+      if (cols.length < 6) continue;
+      const [device, mountPoint, sizeStr, usedStr, freeStr, pcentStr] = cols;
+      if (!device.startsWith('/dev/') || device.startsWith('/dev/loop')) continue;
 
       if (!seen[device] || mountPoint.length < seen[device].mount.length) {
-        const hostPath = mountPoint === '/' ? hostRoot : `${hostRoot}${mountPoint}`;
-        try {
-          const df = execSync(`df -B1 "${hostPath}" 2>/dev/null | tail -1`, { encoding: 'utf8', timeout: 5000 });
-          const cols = df.trim().split(/\s+/);
-          if (cols.length >= 5) {
-            seen[device] = {
-              fs: device,
-              mount: mountPoint,
-              size: parseInt(cols[1]) || 0,
-              used: parseInt(cols[2]) || 0,
-              free: parseInt(cols[3]) || 0,
-              percent: parseFloat(cols[4]) || 0,
-            };
-          }
-        } catch {}
+        seen[device] = {
+          fs: device,
+          mount: mountPoint,
+          size: parseInt(sizeStr) || 0,
+          used: parseInt(usedStr) || 0,
+          free: parseInt(freeStr) || 0,
+          percent: parseFloat(pcentStr) || 0,
+        };
       }
     }
 
