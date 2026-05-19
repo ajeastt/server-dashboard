@@ -182,7 +182,10 @@ export default function Containers() {
 
   const formatPorts = (ports) => {
     if (!ports || ports.length === 0) return '—'
-    return ports.map((p) => `${p.PublicPort || '?'}:${p.PrivatePort}/${p.Type}`).join(', ')
+    return ports.map((p) => {
+      const pub = p.PublicPort > 0 ? p.PublicPort : '-'
+      return `${pub}:${p.PrivatePort}/${p.Type}`
+    }).join(', ')
   }
 
   const statusDot = (state) => {

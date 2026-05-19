@@ -80,15 +80,16 @@ func dockerDelete(path string) ([]byte, error) {
 // ── Response types (mirroring Node.js JSON output) ──
 
 type ContainerResp struct {
-	ID             string       `json:"id"`
-	Name           string       `json:"name"`
-	Image          string       `json:"image"`
-	ImageID        string       `json:"imageId"`
-	State          string       `json:"state"`
-	Status         string       `json:"status"`
-	Ports          []PortResp   `json:"ports"`
-	Created        int64        `json:"created"`
-	ComposeProject string       `json:"composeProject"`
+	ID             string            `json:"id"`
+	Name           string            `json:"name"`
+	Image          string            `json:"image"`
+	ImageID        string            `json:"imageId"`
+	State          string            `json:"state"`
+	Status         string            `json:"status"`
+	Ports          []PortResp        `json:"ports"`
+	Created        int64             `json:"created"`
+	ComposeProject string            `json:"composeProject"`
+	Labels         map[string]string `json:"-"`
 }
 
 type PortResp struct {
@@ -230,7 +231,6 @@ func listContainers() ([]ContainerResp, error) {
 		if len(c.Names) > 0 {
 			name = strings.TrimPrefix(c.Names[0], "/")
 		}
-		proj := c.Labels["com.docker.compose.project"]
 		res = append(res, ContainerResp{
 			ID:             c.ID[:12],
 			Name:           name,
@@ -240,7 +240,8 @@ func listContainers() ([]ContainerResp, error) {
 			Status:         c.Status,
 			Ports:          c.Ports,
 			Created:        c.Created,
-			ComposeProject: proj,
+			ComposeProject: c.Labels["com.docker.compose.project"],
+			Labels:         c.Labels,
 		})
 	}
 	return res, nil
@@ -344,6 +345,36 @@ func stripDockerHeaders(data []byte) string {
 		}
 		out.Write(data[offset+8 : offset+8+payloadLen])
 		offset += 8 + payloadLen
+	}
+	return out.String()
+}
+
+// dockerLogReader buffers raw log data and extracts complete Docker log frames.
+// Docker log framing: 8-byte header (stream type[1] + padding[3] + big-endian length[4]) + payload.
+// TCP reads may split frames arbitrarily; this reader handles that correctly.
+type dockerLogReader struct {
+	buf []byte
+}
+
+func newDockerLogReader() *dockerLogReader {
+	return &dockerLogReader{}
+}
+
+// Write feeds raw bytes into the reader. It returns any complete frames' payload as text.
+func (r *dockerLogReader) Write(data []byte) string {
+	r.buf = append(r.buf, data...)
+	var out strings.Builder
+	for {
+		if len(r.buf) < 8 {
+			break
+		}
+		payloadLen := (int(r.buf[4]) << 24) | (int(r.buf[5]) << 16) | (int(r.buf[6]) << 8) | int(r.buf[7])
+		frameEnd := 8 + payloadLen
+		if len(r.buf) < frameEnd {
+			break
+		}
+		out.Write(r.buf[8:frameEnd])
+		r.buf = r.buf[frameEnd:]
 	}
 	return out.String()
 }
@@ -706,19 +737,7 @@ func listStacks() ([]StackResp, error) {
 	order := []string{}
 
 	for _, c := range ctrs {
-		// Get full inspect for labels
-		b, err := dockerGet("/containers/" + c.ID + "/json")
-		if err != nil {
-			continue
-		}
-		var info struct {
-			Config struct {
-				Labels map[string]string `json:"Labels"`
-			} `json:"Config"`
-		}
-		json.Unmarshal(b, &info)
-
-		stackName := info.Config.Labels["com.docker.compose.project"]
+		stackName := c.Labels["com.docker.compose.project"]
 		if stackName == "" {
 			continue
 		}
@@ -727,7 +746,7 @@ func listStacks() ([]StackResp, error) {
 			stackMap[stackName] = &StackResp{Name: stackName, Services: []StackService{}, Status: "running"}
 			order = append(order, stackName)
 		}
-		svcName := info.Config.Labels["com.docker.compose.service"]
+		svcName := c.Labels["com.docker.compose.service"]
 		if svcName == "" {
 			svcName = c.Name
 		}

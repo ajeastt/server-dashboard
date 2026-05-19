@@ -28,6 +28,7 @@ func handleWebSocket(c *websocket.Conn) {
 		mu             sync.Mutex
 		metricsUnsub   func()
 		termConn       net.Conn
+		termExecID     string
 		logCancel      func()
 	)
 
@@ -123,6 +124,7 @@ func handleWebSocket(c *websocket.Conn) {
 			}
 
 			termConn = conn
+			termExecID = execResp.ID
 
 			// Resize
 			dockerPost(fmt.Sprintf("/exec/%s/resize?h=%d&w=%d", execResp.ID, rows, cols), nil)
@@ -155,14 +157,24 @@ func handleWebSocket(c *websocket.Conn) {
 			}
 
 		case "terminal-resize":
-			// Resize is handled via HTTP POST - but we need exec ID
-			// For simplicity, skip resize for now (terminal works without it)
+			if termExecID != "" {
+				cols := msg.Cols
+				if cols == 0 {
+					cols = 80
+				}
+				rows := msg.Rows
+				if rows == 0 {
+					rows = 24
+				}
+				dockerPost(fmt.Sprintf("/exec/%s/resize?h=%d&w=%d", termExecID, rows, cols), nil)
+			}
 
 		case "terminal-stop":
 			if termConn != nil {
 				termConn.Close()
 				termConn = nil
 			}
+			termExecID = ""
 
 		case "logs":
 			if logCancel != nil {
@@ -212,6 +224,7 @@ func handleWebSocket(c *websocket.Conn) {
 					}
 
 					buf := make([]byte, 4096)
+					logReader := newDockerLogReader()
 					for {
 						select {
 						case <-cancel:
@@ -222,9 +235,7 @@ func handleWebSocket(c *websocket.Conn) {
 
 						n, err := br.Read(buf)
 						if n > 0 {
-							data := make([]byte, n)
-							copy(data, buf[:n])
-							cleaned := stripDockerHeaders(data)
+							cleaned := logReader.Write(buf[:n])
 							if len(cleaned) > 0 {
 								send(map[string]interface{}{
 									"type": "log-data",

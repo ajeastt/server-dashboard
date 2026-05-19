@@ -126,7 +126,7 @@ func readFileContent(userPath string) (*FileReadResp, error) {
 
 	content, err := os.ReadFile(target)
 	if err != nil {
-		return &FileReadResp{Binary: true}, nil
+		return nil, fmt.Errorf("failed to read file: %v", err)
 	}
 
 	// Quick check for binary content
