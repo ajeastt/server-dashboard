@@ -40,20 +40,23 @@ systemRouter.get('/disks', async (req, res) => {
       const device = parts[0];
       const mountPoint = parts[1]?.replace(/\\040/g, ' ');
       if (!device || !mountPoint || !device.startsWith('/dev/') || device.startsWith('/dev/loop')) continue;
-      if (mountPoint.startsWith('/host/') && mountPoint !== '/host') continue;
+      if (mountPoint.startsWith('/host')) continue;
 
       if (!seen[device] || mountPoint.length < seen[device].mount.length) {
+        const hostPath = mountPoint === '/' ? hostRoot : `${hostRoot}${mountPoint}`;
         try {
-          const df = execSync(`df -B1 "${mountPoint}" 2>/dev/null | tail -1`, { encoding: 'utf8', timeout: 5000 });
+          const df = execSync(`df -B1 "${hostPath}" 2>/dev/null | tail -1`, { encoding: 'utf8', timeout: 5000 });
           const cols = df.trim().split(/\s+/);
-          seen[device] = {
-            fs: device,
-            mount: mountPoint,
-            size: parseInt(cols[1]) || 0,
-            used: parseInt(cols[2]) || 0,
-            free: parseInt(cols[3]) || 0,
-            percent: parseFloat(cols[4]) || 0,
-          };
+          if (cols.length >= 5) {
+            seen[device] = {
+              fs: device,
+              mount: mountPoint,
+              size: parseInt(cols[1]) || 0,
+              used: parseInt(cols[2]) || 0,
+              free: parseInt(cols[3]) || 0,
+              percent: parseFloat(cols[4]) || 0,
+            };
+          }
         } catch {}
       }
     }
