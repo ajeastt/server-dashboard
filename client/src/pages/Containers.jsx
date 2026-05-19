@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader, Download } from 'lucide-react'
+import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader, Download, Check } from 'lucide-react'
 import { api } from '../lib/api'
 import ContainerCard from '../components/ContainerCard'
 import StackUpdateModal from '../components/StackUpdateModal'
@@ -25,6 +25,8 @@ export default function Containers() {
   const [editLoading, setEditLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [updateStack, setUpdateStack] = useState(null)
+  const [restartingStacks, setRestartingStacks] = useState({})
+  const [restartedStacks, setRestartedStacks] = useState({})
 
   const fetchAll = useCallback(async () => {
     try {
@@ -114,11 +116,18 @@ export default function Containers() {
   }
 
   const handleRestartStack = async (name) => {
+    if (restartingStacks[name]) return
+    setRestartingStacks((prev) => ({ ...prev, [name]: true }))
+    setRestartedStacks((prev) => ({ ...prev, [name]: false }))
     try {
       await api.docker.restartStack(name)
+      setRestartedStacks((prev) => ({ ...prev, [name]: true }))
+      setTimeout(() => setRestartedStacks((prev) => ({ ...prev, [name]: false })), 3000)
       fetchAll()
     } catch (err) {
       console.error('Failed to restart stack:', err)
+    } finally {
+      setRestartingStacks((prev) => ({ ...prev, [name]: false }))
     }
   }
 
@@ -237,19 +246,37 @@ export default function Containers() {
                     {expanded ? <ChevronDown className="w-4 h-4 text-surface-500" /> : <ChevronRight className="w-4 h-4 text-surface-500" />}
                     <Layers className="w-5 h-5 text-accent-400" />
                     <span className="text-sm font-semibold text-surface-200">{stack.name}</span>
-                    <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                      stack.status === 'running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-800 text-surface-500'
-                    }`}>
-                      {stack.status}
-                    </span>
+                    {restartingStacks[stack.name] ? (
+                      <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 animate-pulse">
+                        restarting
+                      </span>
+                    ) : (
+                      <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
+                        stack.status === 'running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-800 text-surface-500'
+                      }`}>
+                        {stack.status}
+                      </span>
+                    )}
                     <span className="text-xs text-surface-500">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
                     <button onClick={() => setUpdateStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Update all images">
                       <Download className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleRestartStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all" title="Restart stack">
-                      <RefreshCw className="w-4 h-4" />
+                    <button onClick={() => handleRestartStack(stack.name)} className={`p-1.5 rounded-lg transition-all ${
+                      restartedStacks[stack.name]
+                        ? 'text-emerald-400 bg-emerald-500/10'
+                        : restartingStacks[stack.name]
+                          ? 'text-amber-400 bg-amber-500/10 cursor-wait'
+                          : 'text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10'
+                    }`} title={restartingStacks[stack.name] ? 'Restarting...' : 'Restart stack'}>
+                      {restartingStacks[stack.name] ? (
+                        <Loader className="w-4 h-4 animate-spin" />
+                      ) : restartedStacks[stack.name] ? (
+                        <Check className="w-4 h-4" />
+                      ) : (
+                        <RefreshCw className="w-4 h-4" />
+                      )}
                     </button>
                     <button onClick={() => handleEdit(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Edit compose">
                       <Edit3 className="w-4 h-4" />
