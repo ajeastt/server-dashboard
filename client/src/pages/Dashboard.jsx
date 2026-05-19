@@ -51,8 +51,6 @@ export default function Dashboard() {
 
   useEffect(() => {
     const unsub = connectDockerEvents((e) => {
-      if (e.Type !== 'container' && e.Type !== 'image' && e.Type !== 'volume' && e.Type !== 'network') return
-      if (e.Action && e.Action.startsWith('exec_')) return
       setEvents((prev) => [...prev.slice(-99), e])
     })
     return unsub

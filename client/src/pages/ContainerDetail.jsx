@@ -22,9 +22,10 @@ export default function ContainerDetail() {
 
   useEffect(() => {
     api.docker.container(id).then(setContainer).catch(() => {})
+    api.docker.stats(id).then(setStats).catch(() => {})
     api.docker.logs(id, 200).then((d) => setLogs(d.logs)).catch(() => {})
 
-    const fetchStats = () => {
+    const interval = setInterval(() => {
       api.docker.stats(id).then((s) => {
         setStats(s)
         const h = statsHistoryRef.current
@@ -36,10 +37,7 @@ export default function ContainerDetail() {
         statsHistoryRef.current = h
         setStatsHistory({ cpu: [...h.cpu], mem: [...h.mem], rx: [...h.rx], tx: [...h.tx] })
       }).catch(() => {})
-    }
-
-    fetchStats()
-    const interval = setInterval(fetchStats, 3000)
+    }, 3000)
     return () => clearInterval(interval)
   }, [id])
 
