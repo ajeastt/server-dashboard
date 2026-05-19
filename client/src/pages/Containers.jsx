@@ -1,7 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader, Download, Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader, Download, Check, Play, Square } from 'lucide-react'
 import { api } from '../lib/api'
-import ContainerCard from '../components/ContainerCard'
+import { stateColor } from '../lib/utils'
 import StackUpdateModal from '../components/StackUpdateModal'
 
 export default function Containers() {
@@ -25,8 +26,10 @@ export default function Containers() {
   const [editLoading, setEditLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [updateStack, setUpdateStack] = useState(null)
+
   const [restartingStacks, setRestartingStacks] = useState({})
   const [restartedStacks, setRestartedStacks] = useState({})
+  const [actingContainers, setActingContainers] = useState({})
 
   const fetchAll = useCallback(async () => {
     try {
@@ -50,11 +53,31 @@ export default function Containers() {
   }, [fetchAll])
 
   const handleAction = async (id, action) => {
+    if (actingContainers[id]) return
+    setActingContainers((prev) => ({ ...prev, [id]: true }))
     try {
       await api.docker.action(id, action)
       fetchAll()
     } catch (err) {
       console.error(`Action ${action} failed:`, err)
+    } finally {
+      setActingContainers((prev) => ({ ...prev, [id]: false }))
+    }
+  }
+
+  const handleRestartStack = async (name) => {
+    if (restartingStacks[name]) return
+    setRestartingStacks((prev) => ({ ...prev, [name]: true }))
+    setRestartedStacks((prev) => ({ ...prev, [name]: false }))
+    try {
+      await api.docker.restartStack(name)
+      setRestartedStacks((prev) => ({ ...prev, [name]: true }))
+      setTimeout(() => setRestartedStacks((prev) => ({ ...prev, [name]: false })), 3000)
+      fetchAll()
+    } catch (err) {
+      console.error('Failed to restart stack:', err)
+    } finally {
+      setRestartingStacks((prev) => ({ ...prev, [name]: false }))
     }
   }
 
@@ -84,11 +107,7 @@ export default function Containers() {
     setError('')
     try {
       const result = await api.docker.validateCompose(yaml)
-      if (result.valid) {
-        setValidMsg({ type: 'success', text: 'Valid compose file' })
-      } else {
-        setValidMsg({ type: 'error', text: result.error })
-      }
+      setValidMsg(result.valid ? { type: 'success', text: 'Valid compose file' } : { type: 'error', text: result.error })
     } catch (err) {
       setValidMsg({ type: 'error', text: err.message })
     } finally {
@@ -112,22 +131,6 @@ export default function Containers() {
       setError(err.message)
     } finally {
       setDeploying(false)
-    }
-  }
-
-  const handleRestartStack = async (name) => {
-    if (restartingStacks[name]) return
-    setRestartingStacks((prev) => ({ ...prev, [name]: true }))
-    setRestartedStacks((prev) => ({ ...prev, [name]: false }))
-    try {
-      await api.docker.restartStack(name)
-      setRestartedStacks((prev) => ({ ...prev, [name]: true }))
-      setTimeout(() => setRestartedStacks((prev) => ({ ...prev, [name]: false })), 3000)
-      fetchAll()
-    } catch (err) {
-      console.error('Failed to restart stack:', err)
-    } finally {
-      setRestartingStacks((prev) => ({ ...prev, [name]: false }))
     }
   }
 
@@ -177,50 +180,40 @@ export default function Containers() {
     }
   }
 
+  const formatPorts = (ports) => {
+    if (!ports || ports.length === 0) return '—'
+    return ports.map((p) => `${p.PublicPort || '?'}:${p.PrivatePort}/${p.Type}`).join(', ')
+  }
+
+  const statusDot = (state) => {
+    const colors = { running: 'bg-emerald-400', paused: 'bg-amber-400', exited: 'bg-red-400', stopped: 'bg-red-400' }
+    return <span className={`w-2 h-2 rounded-full inline-block ${colors[state] || 'bg-surface-500'}`} />
+  }
+
   return (
     <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-100 tracking-tight">Containers</h1>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowDeploy(true)}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all shadow-lg shadow-accent-500/20"
-          >
-            <Plus className="w-4 h-4" />
-            Deploy
+          <button onClick={() => setShowDeploy(true)} className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all shadow-lg shadow-accent-500/20">
+            <Plus className="w-4 h-4" /> Deploy
           </button>
-          <button
-            onClick={fetchAll}
-            className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-surface-800 hover:bg-surface-700 text-surface-300 transition-all"
-          >
-            <RefreshCw className="w-4 h-4" />
-            Refresh
+          <button onClick={fetchAll} className="flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg bg-surface-800 hover:bg-surface-700 text-surface-300 transition-all">
+            <RefreshCw className="w-4 h-4" /> Refresh
           </button>
         </div>
       </div>
 
+      {/* Search + Filter */}
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-500" />
-          <input
-            type="text"
-            placeholder="Search containers..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-surface-800 bg-surface-900 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all"
-          />
+          <input type="text" placeholder="Search containers..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-surface-800 bg-surface-900 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all" />
         </div>
         <div className="flex gap-1.5">
           {['all', 'running', 'exited', 'paused'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-2 text-sm font-medium rounded-lg capitalize transition-all ${
-                filter === f
-                  ? 'bg-accent-500/10 text-accent-400 border border-accent-500/20'
-                  : 'text-surface-400 hover:text-surface-200 border border-surface-800 hover:bg-surface-800'
-              }`}
-            >
+            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-2 text-sm font-medium rounded-lg capitalize transition-all ${filter === f ? 'bg-accent-500/10 text-accent-400 border border-accent-500/20' : 'text-surface-400 hover:text-surface-200 border border-surface-800 hover:bg-surface-800'}`}>
               {f}
             </button>
           ))}
@@ -232,7 +225,7 @@ export default function Containers() {
           <div className="text-surface-500 text-sm">Loading containers...</div>
         </div>
       ) : (
-        <div className="space-y-8">
+        <div className="space-y-4">
           {stacks.map((stack) => {
             const ctrs = projectContainers[stack.name]?.filter(containerPassesFilter) || []
             if (ctrs.length === 0 && !search) return null
@@ -241,42 +234,27 @@ export default function Containers() {
 
             return (
               <div key={stack.name} className="rounded-xl border border-surface-800 bg-surface-900/50 overflow-hidden">
-                <div className="flex items-center gap-3 px-5 py-3.5 bg-surface-900 border-b border-surface-800/50">
+                {/* Stack header */}
+                <div className="flex items-center gap-3 px-4 py-3 bg-surface-900 border-b border-surface-800/50">
                   <button onClick={() => toggleStack(stack.name)} className="flex items-center gap-3 flex-1 text-left">
                     {expanded ? <ChevronDown className="w-4 h-4 text-surface-500" /> : <ChevronRight className="w-4 h-4 text-surface-500" />}
                     <Layers className="w-5 h-5 text-accent-400" />
                     <span className="text-sm font-semibold text-surface-200">{stack.name}</span>
                     {restartingStacks[stack.name] ? (
-                      <span className="ml-2 text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 animate-pulse">
-                        restarting
-                      </span>
+                      <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 animate-pulse">restarting</span>
                     ) : (
-                      <span className={`ml-2 text-xs font-medium px-2 py-0.5 rounded-full ${
-                        stack.status === 'running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-800 text-surface-500'
-                      }`}>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${stack.status === 'running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-surface-800 text-surface-500'}`}>
                         {stack.status}
                       </span>
                     )}
                     <span className="text-xs text-surface-500">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
-                    <button onClick={() => setUpdateStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Update all images">
+                    <button onClick={() => setUpdateStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Update images">
                       <Download className="w-4 h-4" />
                     </button>
-                    <button onClick={() => handleRestartStack(stack.name)} className={`p-1.5 rounded-lg transition-all ${
-                      restartedStacks[stack.name]
-                        ? 'text-emerald-400 bg-emerald-500/10'
-                        : restartingStacks[stack.name]
-                          ? 'text-amber-400 bg-amber-500/10 cursor-wait'
-                          : 'text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10'
-                    }`} title={restartingStacks[stack.name] ? 'Restarting...' : 'Restart stack'}>
-                      {restartingStacks[stack.name] ? (
-                        <Loader className="w-4 h-4 animate-spin" />
-                      ) : restartedStacks[stack.name] ? (
-                        <Check className="w-4 h-4" />
-                      ) : (
-                        <RefreshCw className="w-4 h-4" />
-                      )}
+                    <button onClick={() => handleRestartStack(stack.name)} className={`p-1.5 rounded-lg transition-all ${restartedStacks[stack.name] ? 'text-emerald-400 bg-emerald-500/10' : restartingStacks[stack.name] ? 'text-amber-400 bg-amber-500/10 cursor-wait' : 'text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10'}`} title={restartingStacks[stack.name] ? 'Restarting...' : 'Restart stack'}>
+                      {restartingStacks[stack.name] ? <Loader className="w-4 h-4 animate-spin" /> : restartedStacks[stack.name] ? <Check className="w-4 h-4" /> : <RefreshCw className="w-4 h-4" />}
                     </button>
                     <button onClick={() => handleEdit(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Edit compose">
                       <Edit3 className="w-4 h-4" />
@@ -286,30 +264,97 @@ export default function Containers() {
                     </button>
                   </div>
                 </div>
-                {expanded && (
-                  <div className="p-4 pt-3">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                      {ctrs.map((c) => (
-                        <ContainerCard key={c.id} container={c} onAction={handleAction} />
-                      ))}
-                    </div>
+
+                {/* Container table */}
+                {expanded && ctrs.length > 0 && (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <tbody className="divide-y divide-surface-800/50">
+                        {ctrs.map((c) => (
+                          <tr key={c.id} className="hover:bg-surface-800/30 transition-all">
+                            <td className="px-4 py-3 w-6">{statusDot(c.state)}</td>
+                            <td className="px-2 py-3">
+                              <Link to={`/containers/${c.id}`} className="text-surface-200 font-medium hover:text-accent-400 transition-colors">
+                                {c.name}
+                              </Link>
+                            </td>
+                            <td className="px-3 py-3 text-surface-500 truncate max-w-[200px] hidden md:table-cell">{c.image}</td>
+                            <td className="px-3 py-3 text-surface-500 text-xs font-mono truncate max-w-[200px] hidden lg:table-cell">{formatPorts(c.ports)}</td>
+                            <td className="px-3 py-3 text-surface-400 text-xs whitespace-nowrap">{c.status}</td>
+                            <td className="px-3 py-3 w-24">
+                              <div className="flex items-center gap-0.5">
+                                {c.state === 'running' ? (
+                                  <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
+                                    {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
+                                  </button>
+                                ) : (
+                                  <button onClick={() => handleAction(c.id, 'start')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all disabled:opacity-50" title="Start">
+                                    {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                                  </button>
+                                )}
+                                <button onClick={() => handleAction(c.id, 'restart')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Restart">
+                                  <RefreshCw className="w-3.5 h-3.5" />
+                                </button>
+                                <Link to={`/containers/${c.id}`} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Details / Logs">
+                                  <Terminal className="w-3.5 h-3.5" />
+                                </Link>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 )}
               </div>
             )
           })}
 
+          {/* Standalone containers */}
           {standalone.length > 0 && (
-            <div>
-              <div className="flex items-center gap-2 mb-4">
+            <div className="rounded-xl border border-surface-800 bg-surface-900/50 overflow-hidden">
+              <div className="flex items-center gap-2 px-4 py-3 bg-surface-900 border-b border-surface-800/50">
                 <Box className="w-4 h-4 text-surface-500" />
-                <h2 className="text-sm font-semibold text-surface-400 uppercase tracking-wider">Standalone Containers</h2>
+                <h2 className="text-sm font-semibold text-surface-400 tracking-wide">Standalone</h2>
                 <span className="text-xs text-surface-600">{standalone.length}</span>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                {standalone.map((c) => (
-                  <ContainerCard key={c.id} container={c} onAction={handleAction} />
-                ))}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <tbody className="divide-y divide-surface-800/50">
+                    {standalone.map((c) => (
+                      <tr key={c.id} className="hover:bg-surface-800/30 transition-all">
+                        <td className="px-4 py-3 w-6">{statusDot(c.state)}</td>
+                        <td className="px-2 py-3">
+                          <Link to={`/containers/${c.id}`} className="text-surface-200 font-medium hover:text-accent-400 transition-colors">
+                            {c.name}
+                          </Link>
+                        </td>
+                        <td className="px-3 py-3 text-surface-500 truncate max-w-[200px] hidden md:table-cell">{c.image}</td>
+                        <td className="px-3 py-3 text-surface-500 text-xs font-mono truncate max-w-[200px] hidden lg:table-cell">{formatPorts(c.ports)}</td>
+                        <td className="px-3 py-3 text-surface-400 text-xs whitespace-nowrap">{c.status}</td>
+                        <td className="px-3 py-3 w-24">
+                          <div className="flex items-center gap-0.5">
+                            {c.state === 'running' ? (
+                              <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
+                                {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Square className="w-3.5 h-3.5" />}
+                              </button>
+                            ) : (
+                              <button onClick={() => handleAction(c.id, 'start')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all disabled:opacity-50" title="Start">
+                                {actingContainers[c.id] ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+                              </button>
+                            )}
+                            <button onClick={() => handleAction(c.id, 'restart')} disabled={actingContainers[c.id]} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Restart">
+                              <RefreshCw className="w-3.5 h-3.5" />
+                            </button>
+                            <Link to={`/containers/${c.id}`} className="p-1.5 rounded text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Details / Logs">
+                              <Terminal className="w-3.5 h-3.5" />
+                            </Link>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
           )}
@@ -318,30 +363,22 @@ export default function Containers() {
             <div className="flex flex-col items-center justify-center h-64 gap-3">
               <Box className="w-12 h-12 text-surface-700" />
               <div className="text-surface-500 text-sm">No containers found.</div>
-              <button
-                onClick={() => setShowDeploy(true)}
-                className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-accent-500/10 text-accent-400 hover:bg-accent-500/20 transition-all"
-              >
-                <Plus className="w-4 h-4" />
-                Deploy your first stack
+              <button onClick={() => setShowDeploy(true)} className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-accent-500/10 text-accent-400 hover:bg-accent-500/20 transition-all">
+                <Plus className="w-4 h-4" /> Deploy your first stack
               </button>
             </div>
           )}
         </div>
       )}
 
+      {/* Deploy modal */}
       {showDeploy && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-2xl mx-4 rounded-xl border border-surface-700 bg-surface-900 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between p-5 border-b border-surface-800">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent-500/10 text-accent-400">
-                  <Terminal className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-surface-200">Deploy Stack</h2>
-                  <p className="text-xs text-surface-500">Paste your docker-compose.yml below</p>
-                </div>
+              <div>
+                <h2 className="text-sm font-semibold text-surface-200">Deploy Stack</h2>
+                <p className="text-xs text-surface-500 mt-0.5">Paste your docker-compose.yml below</p>
               </div>
               <button onClick={() => { setShowDeploy(false); setError(''); setValidMsg(null) }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
                 <X className="w-4 h-4" />
@@ -357,9 +394,7 @@ export default function Containers() {
                 <textarea value={composeYaml} onChange={(e) => setComposeYaml(e.target.value)} placeholder={`services:\n  app:\n    image: nginx:latest\n    ports:\n      - "80:80"`} rows={12} className="w-full px-3 py-2 text-sm rounded-lg border border-surface-700 bg-surface-850 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all font-mono resize-none" required />
               </div>
               {validMsg && (
-                <div className={`p-3 rounded-lg border text-sm ${
-                  validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
-                }`}>
+                <div className={`p-3 rounded-lg border text-sm ${validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
                   {validMsg.text}
                 </div>
               )}
@@ -367,7 +402,7 @@ export default function Containers() {
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => { setShowDeploy(false); setError(''); setValidMsg(null) }} className="px-4 py-2 text-sm font-medium rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-all">Cancel</button>
                 <button type="button" onClick={handleValidate} disabled={validating || !composeYaml} className="px-4 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all disabled:opacity-50">{validating ? 'Validating...' : 'Validate'}</button>
-                <button type="submit" disabled={deploying} className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">{deploying ? 'Deploying...' : 'Deploy'}</button>
+                <button type="submit" disabled={deploying} className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all disabled:opacity-50">{deploying ? 'Deploying...' : 'Deploy'}</button>
               </div>
             </form>
           </div>
@@ -375,25 +410,17 @@ export default function Containers() {
       )}
 
       {updateStack && (
-        <StackUpdateModal
-          name={updateStack}
-          onClose={() => setUpdateStack(null)}
-          onDone={handleUpdateDone}
-        />
+        <StackUpdateModal name={updateStack} onClose={() => setUpdateStack(null)} onDone={handleUpdateDone} />
       )}
 
+      {/* Edit modal */}
       {editStack && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <div className="w-full max-w-2xl mx-4 rounded-xl border border-surface-700 bg-surface-900 shadow-2xl animate-slide-up">
             <div className="flex items-center justify-between p-5 border-b border-surface-800">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-accent-500/10 text-accent-400">
-                  <Edit3 className="w-5 h-5" />
-                </div>
-                <div>
-                  <h2 className="text-sm font-semibold text-surface-200">Edit Stack: {editStack}</h2>
-                  <p className="text-xs text-surface-500">Edit docker-compose.yml and redeploy</p>
-                </div>
+              <div>
+                <h2 className="text-sm font-semibold text-surface-200">Edit Stack: {editStack}</h2>
+                <p className="text-xs text-surface-500 mt-0.5">Edit docker-compose.yml and redeploy</p>
               </div>
               <button onClick={() => { setEditStack(null); setError(''); setValidMsg(null) }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
                 <X className="w-4 h-4" />
@@ -407,9 +434,7 @@ export default function Containers() {
               <form onSubmit={handleSave} className="p-5 space-y-4">
                 <textarea value={editYaml} onChange={(e) => setEditYaml(e.target.value)} rows={18} className="w-full px-3 py-2 text-sm rounded-lg border border-surface-700 bg-surface-850 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all font-mono resize-none" required />
                 {validMsg && (
-                  <div className={`p-3 rounded-lg border text-sm ${
-                    validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'
-                  }`}>
+                  <div className={`p-3 rounded-lg border text-sm ${validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>
                     {validMsg.text}
                   </div>
                 )}
@@ -417,7 +442,7 @@ export default function Containers() {
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={() => { setEditStack(null); setError(''); setValidMsg(null) }} className="px-4 py-2 text-sm font-medium rounded-lg text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-all">Cancel</button>
                   <button type="button" onClick={handleValidate} disabled={validating || !editYaml} className="px-4 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all disabled:opacity-50">{validating ? 'Validating...' : 'Validate'}</button>
-                  <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed">{saving ? 'Saving & Redeploying...' : 'Save & Redeploy'}</button>
+                  <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-all disabled:opacity-50">{saving ? 'Saving & Redeploying...' : 'Save & Redeploy'}</button>
                 </div>
               </form>
             )}
