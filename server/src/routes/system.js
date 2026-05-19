@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { execSync } from 'child_process';
 import si from 'systeminformation';
 import { getSystemInfo } from '../services/monitoring.js';
 
@@ -22,8 +23,21 @@ systemRouter.get('/disks', async (req, res) => {
       let mount = d.mount;
       if (mount === '/host') mount = '/';
       else if (mount.startsWith('/host/')) mount = mount.slice(5);
-      if (!seen[d.fs] || mount.length < seen[d.fs].mount.length) {
-        seen[d.fs] = { fs: d.fs, mount, size: d.size, used: d.used, free: d.free, percent: d.use };
+      const key = d.fs;
+      if (!seen[key] || mount.length < seen[key].mount.length) {
+        const hostPath = mount === '/' ? '/host' : `/host${mount}`;
+        let size = d.size, used = d.used, free = d.available || 0, percent = d.use;
+        try {
+          const df = execSync(`df -B1 --output=source,target,size,used,avail,pcent "${hostPath}" 2>/dev/null | tail -1`, { encoding: 'utf8', timeout: 3000 });
+          const cols = df.trim().split(/\s+/);
+          if (cols.length >= 6) {
+            size = parseInt(cols[2]) || size;
+            used = parseInt(cols[3]) || used;
+            free = parseInt(cols[4]) || free;
+            percent = parseFloat(cols[5]) || percent;
+          }
+        } catch {}
+        seen[key] = { fs: d.fs, mount, size, used, free, percent };
       }
     }
     res.json(Object.values(seen));
