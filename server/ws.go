@@ -192,6 +192,7 @@ func handleWebSocket(c *websocket.Conn) {
 			go func() {
 				filters := url.Values{}
 				filters.Set("filters", fmt.Sprintf(`{"container":{"%s":true}}`, containerID))
+				eventURL := fmt.Sprintf("http://localhost/events?%s", filters.Encode())
 				for {
 					select {
 					case <-cancel:
@@ -199,28 +200,13 @@ func handleWebSocket(c *websocket.Conn) {
 					default:
 					}
 
-					conn, err := net.Dial("unix", "/var/run/docker.sock")
+					resp, err := httpDockerStream.Get(eventURL)
 					if err != nil {
 						time.Sleep(2 * time.Second)
 						continue
 					}
 
-					req := fmt.Sprintf("GET /events?%s HTTP/1.1\r\nHost: localhost\r\n\r\n", filters.Encode())
-					conn.Write([]byte(req))
-
-					br := bufio.NewReader(conn)
-					for {
-						line, err := br.ReadString('\n')
-						if err != nil {
-							conn.Close()
-							break
-						}
-						if strings.TrimSpace(line) == "" {
-							break
-						}
-					}
-
-					scanner := bufio.NewScanner(br)
+					scanner := bufio.NewScanner(resp.Body)
 					for scanner.Scan() {
 						line := scanner.Text()
 						if line == "" {
@@ -232,7 +218,7 @@ func handleWebSocket(c *websocket.Conn) {
 						}
 						select {
 						case <-cancel:
-							conn.Close()
+							resp.Body.Close()
 							return
 						default:
 						}
@@ -241,11 +227,11 @@ func handleWebSocket(c *websocket.Conn) {
 							"event": ev,
 						})
 					}
-					conn.Close()
+					resp.Body.Close()
 				}
 			}()
 
-			// Stream container logs
+			// Stream container logs via Go HTTP client (handles chunked encoding)
 			go func() {
 				for {
 					select {
@@ -254,43 +240,20 @@ func handleWebSocket(c *websocket.Conn) {
 					default:
 					}
 
-					conn, err := net.Dial("unix", "/var/run/docker.sock")
+					url := fmt.Sprintf("http://localhost/containers/%s/logs?stdout=true&stderr=true&follow=true&tail=100000", containerID)
+					resp, err := httpDockerStream.Get(url)
 					if err != nil {
 						send(WSMessage{Type: "log-error", Error: err.Error()})
 						return
 					}
 
-					// NO Connection: close — Docker keeps conn open for follow=true
-					req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=100000 HTTP/1.1\r\nHost: localhost\r\n\r\n",
-						containerID)
-					conn.Write([]byte(req))
-
-					br := bufio.NewReader(conn)
-					// Skip HTTP headers
-					headersOK := true
-					for {
-						line, err := br.ReadString('\n')
-						if err != nil {
-							headersOK = false
-							break
-						}
-						if strings.TrimSpace(line) == "" {
-							break
-						}
-					}
-
-					if !headersOK {
-						conn.Close()
-						send(WSMessage{Type: "log-end"})
-						return
-					}
-
+					br := bufio.NewReader(resp.Body)
 					buf := make([]byte, 4096)
 					logReader := newDockerLogReader()
 					for {
 						select {
 						case <-cancel:
-							conn.Close()
+							resp.Body.Close()
 							return
 						default:
 						}
@@ -306,7 +269,7 @@ func handleWebSocket(c *websocket.Conn) {
 							}
 						}
 						if err != nil {
-							conn.Close()
+							resp.Body.Close()
 							// Check if container still exists before reconnecting
 							_, inspectErr := dockerGet("/containers/" + containerID + "/json")
 							if inspectErr != nil {

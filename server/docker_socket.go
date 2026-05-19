@@ -27,6 +27,15 @@ var httpDocker = &http.Client{
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
+// httpDockerStream has no timeout for long-lived streaming connections (logs follow, events).
+var httpDockerStream = &http.Client{
+	Transport: &http.Transport{
+		Dial: func(proto, addr string) (net.Conn, error) {
+			return net.Dial("unix", "/var/run/docker.sock")
+		},
+	},
+}
+
 var dockerVersion string
 
 func dockerGet(path string) ([]byte, error) {
