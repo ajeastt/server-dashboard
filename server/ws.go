@@ -8,7 +8,6 @@ import (
 	"net"
 	"strings"
 	"sync"
-	"time"
 
 	"github.com/gofiber/contrib/websocket"
 )
@@ -171,11 +170,6 @@ func handleWebSocket(c *websocket.Conn) {
 				logCancel = nil
 			}
 
-			tail := "all"
-			if msg.Tail > 0 {
-				tail = fmt.Sprintf("%d", msg.Tail)
-			}
-
 			containerID := msg.Container
 			cancel := make(chan struct{})
 			logCancel = func() { close(cancel) }
@@ -194,15 +188,16 @@ func handleWebSocket(c *websocket.Conn) {
 						return
 					}
 
-					req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=%s HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
-						containerID, tail)
+					req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=100000 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+						containerID)
 					conn.Write([]byte(req))
 
 					br := bufio.NewReader(conn)
+					headersOK := true
 					for {
 						line, err := br.ReadString('\n')
 						if err != nil {
-							conn.Close()
+							headersOK = false
 							break
 						}
 						if strings.TrimSpace(line) == "" {
@@ -210,8 +205,13 @@ func handleWebSocket(c *websocket.Conn) {
 						}
 					}
 
+					if !headersOK {
+						conn.Close()
+						send(WSMessage{Type: "log-end"})
+						return
+					}
+
 					buf := make([]byte, 4096)
-					streamOk := true
 					for {
 						select {
 						case <-cancel:
@@ -233,15 +233,10 @@ func handleWebSocket(c *websocket.Conn) {
 							}
 						}
 						if err != nil {
-							streamOk = false
 							conn.Close()
-							break
+							send(WSMessage{Type: "log-end"})
+							return
 						}
-					}
-
-					if !streamOk {
-						tail = "all"
-						time.Sleep(2 * time.Second)
 					}
 				}
 			}()
