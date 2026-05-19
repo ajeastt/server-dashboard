@@ -15,23 +15,23 @@ export default function Terminal({ containerId }) {
       fontSize: 13,
       fontFamily: '"JetBrains Mono", "SF Mono", "Fira Code", monospace',
       theme: {
-        background: '#0d0d14',
-        foreground: '#e2e8f0',
-        cursor: '#6366f1',
-        selectionBackground: 'rgba(99, 102, 241, 0.3)',
-        black: '#181825',
+        background: '#0b0b10',
+        foreground: '#e4e4ed',
+        cursor: '#06b6d4',
+        selectionBackground: 'rgba(6, 182, 212, 0.25)',
+        black: '#1e1e2c',
         red: '#ef4444',
         green: '#22c55e',
         yellow: '#eab308',
-        blue: '#6366f1',
+        blue: '#06b6d4',
         magenta: '#a855f7',
         cyan: '#22d3ee',
-        white: '#e2e8f0',
-        brightBlack: '#475569',
+        white: '#e4e4ed',
+        brightBlack: '#5a5a6a',
         brightRed: '#f87171',
         brightGreen: '#4ade80',
         brightYellow: '#facc15',
-        brightBlue: '#818cf8',
+        brightBlue: '#22d3ee',
         brightMagenta: '#c084fc',
         brightCyan: '#67e8f9',
         brightWhite: '#f8fafc',
@@ -41,51 +41,25 @@ export default function Terminal({ containerId }) {
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(termRef.current)
-
     requestAnimationFrame(() => fitAddon.fit())
 
     const ws = createWS()
     wsRef.current = ws
 
-    ws.on('terminal-output', (msg) => {
-      term.write(atob(msg.data))
-    })
-    ws.on('terminal-end', () => {
-      term.write('\r\n\x1b[31m[process exited]\x1b[0m\r\n')
-    })
-    ws.on('terminal-error', (msg) => {
-      term.write(`\r\n\x1b[31m[error: ${msg.error}]\x1b[0m\r\n`)
-    })
+    ws.on('terminal-output', (msg) => term.write(atob(msg.data)))
+    ws.on('terminal-end', () => term.write('\r\n\x1b[31m[process exited]\x1b[0m\r\n'))
+    ws.on('terminal-error', (msg) => term.write(`\r\n\x1b[31m[error: ${msg.error}]\x1b[0m\r\n`))
 
-    term.onData((data) => {
-      ws.send({ type: 'terminal-input', data })
-    })
+    term.onData((data) => ws.send({ type: 'terminal-input', data }))
+    term.onResize(({ cols, rows }) => ws.send({ type: 'terminal-resize', cols, rows }))
 
-    term.onResize(({ cols, rows }) => {
-      ws.send({ type: 'terminal-resize', cols, rows })
-    })
+    ws.send({ type: 'terminal', container: containerId, cols: term.cols, rows: term.rows })
 
-    const dims = { cols: term.cols, rows: term.rows }
-    ws.send({ type: 'terminal', container: containerId, ...dims })
+    const ro = new ResizeObserver(() => { try { fitAddon.fit() } catch {} })
+    ro.observe(termRef.current)
 
-    const resizeObserver = new ResizeObserver(() => {
-      try { fitAddon.fit() } catch {}
-    })
-    resizeObserver.observe(termRef.current)
-
-    return () => {
-      ws.send({ type: 'terminal-stop' })
-      ws.close()
-      term.dispose()
-      resizeObserver.disconnect()
-    }
+    return () => { ws.send({ type: 'terminal-stop' }); ws.close(); term.dispose(); ro.disconnect() }
   }, [containerId])
 
-  return (
-    <div
-      ref={termRef}
-      className="rounded-2xl border border-surface-700/50 overflow-hidden"
-      style={{ height: '480px' }}
-    />
-  )
+  return <div ref={termRef} className="rounded-lg border border-base-700/50 overflow-hidden" style={{ height: '480px' }} />
 }

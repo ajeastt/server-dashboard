@@ -22,118 +22,43 @@ export default function StackUpdateModal({ name, onClose, onDone }) {
 
   useEffect(() => {
     const es = new EventSource(`/api/docker/stacks/${encodeURIComponent(name)}/update-stream`)
-
     es.onmessage = (e) => {
       try {
         const obj = JSON.parse(e.data)
-        if (obj.stream) {
-          const textLines = obj.stream.split('\n').filter(Boolean)
-          bufRef.current.push(...textLines.map((t) => ({ text: t, type: 'output' })))
-        }
+        if (obj.stream) bufRef.current.push(...obj.stream.split('\n').filter(Boolean).map((t) => ({ text: t, type: 'output' })))
       } catch {}
     }
-
-    es.addEventListener('phase', (e) => {
-      const d = JSON.parse(e.data)
-      setPhase(d.phase)
-      bufRef.current.push({ text: '--- Restarting services ---', type: 'phase' })
-    })
-
-    es.addEventListener('no-update', () => {
-      clearInterval(timerRef.current)
-      setLines((prev) => [...prev, ...bufRef.current, { text: 'All images already up to date', type: 'done' }])
-      bufRef.current = []
-      setStatus('done')
-      es.close()
-      closeTimerRef.current = setTimeout(() => { if (onDone) onDone() }, 1500)
-    })
-
-    es.addEventListener('done', () => {
-      clearInterval(timerRef.current)
-      setLines((prev) => [...prev, ...bufRef.current, { text: 'Stack updated successfully', type: 'done' }])
-      bufRef.current = []
-      setStatus('done')
-      es.close()
-      if (onDone) onDone()
-    })
-
-    es.addEventListener('error', (e) => {
-      clearInterval(timerRef.current)
-      let msg = 'Update failed'
-      try { const d = JSON.parse(e.data); msg = d.error || msg } catch {}
-      setLines((prev) => [...prev, ...bufRef.current, { text: msg, type: 'error' }])
-      bufRef.current = []
-      setStatus('error')
-      es.close()
-    })
-
-    es.onerror = () => {
-      if (status === 'updating') {
-        clearInterval(timerRef.current)
-        setLines((prev) => [...prev, ...bufRef.current, { text: 'Connection lost', type: 'error' }])
-        bufRef.current = []
-        setStatus('error')
-        es.close()
-      }
-    }
-
-    return () => {
-      es.close()
-      clearTimeout(closeTimerRef.current)
-    }
+    es.addEventListener('phase', (e) => { setPhase(JSON.parse(e.data).phase); bufRef.current.push({ text: '--- Restarting services ---', type: 'phase' }) })
+    es.addEventListener('no-update', () => { clearInterval(timerRef.current); setLines((prev) => [...prev, ...bufRef.current, { text: 'All images already up to date', type: 'done' }]); bufRef.current = []; setStatus('done'); es.close(); closeTimerRef.current = setTimeout(() => { if (onDone) onDone() }, 1500) })
+    es.addEventListener('done', () => { clearInterval(timerRef.current); setLines((prev) => [...prev, ...bufRef.current, { text: 'Stack updated successfully', type: 'done' }]); bufRef.current = []; setStatus('done'); es.close(); if (onDone) onDone() })
+    es.addEventListener('error', (e) => { clearInterval(timerRef.current); let msg = 'Update failed'; try { const d = JSON.parse(e.data); msg = d.error || msg } catch {}; setLines((prev) => [...prev, ...bufRef.current, { text: msg, type: 'error' }]); bufRef.current = []; setStatus('error'); es.close() })
+    es.onerror = () => { if (status === 'updating') { clearInterval(timerRef.current); setLines((prev) => [...prev, ...bufRef.current, { text: 'Connection lost', type: 'error' }]); bufRef.current = []; setStatus('error'); es.close() } }
+    return () => { es.close(); clearTimeout(closeTimerRef.current) }
   }, [name])
 
-  useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [lines])
+  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [lines])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="w-full max-w-2xl mx-4 rounded-2xl border border-surface-700/50 bg-surface-900/95 backdrop-blur-xl shadow-2xl animate-scale-in">
-        <div className="flex items-center justify-between p-4 border-b border-surface-800/50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
+      <div className="w-full max-w-2xl mx-4 rounded-xl border border-base-700/60 bg-base-900 shadow-xl animate-fade-in">
+        <div className="flex items-center justify-between p-4 border-b border-base-700/40">
           <div className="flex items-center gap-3">
-            <div className={`p-1.5 rounded-xl ${
-              status === 'done' ? 'bg-emerald-500/10 text-emerald-400' :
-              status === 'error' ? 'bg-red-500/10 text-red-400' :
-              'bg-accent-500/10 text-accent-400'
-            }`}>
-              {status === 'done' ? <CheckCircle className="w-5 h-5" /> :
-               status === 'error' ? <AlertCircle className="w-5 h-5" /> :
-               <Loader className="w-5 h-5 animate-spin" />}
+            <div className={`p-1.5 rounded-lg ${status === 'done' ? 'bg-emerald-500/10 text-emerald-400' : status === 'error' ? 'bg-red-500/10 text-red-400' : 'bg-accent-500/10 text-accent-400'}`}>
+              {status === 'done' ? <CheckCircle className="w-4 h-4" /> : status === 'error' ? <AlertCircle className="w-4 h-4" /> : <Loader className="w-4 h-4 animate-spin" />}
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-surface-200">
-                {status === 'done' && phase === 'pull' ? 'Already up to date' :
-                 phase === 'up' ? 'Restarting services...' : 'Updating images...'}
-              </h2>
-              <p className="text-xs text-surface-500">
-                {status === 'done' ? 'Complete' : status === 'error' ? 'Failed' : 'Stack: ' + name}
-              </p>
+              <h2 className="text-sm font-semibold text-[#e4e4ed]">{status === 'done' && phase === 'pull' ? 'Already up to date' : phase === 'up' ? 'Restarting services...' : 'Updating images...'}</h2>
+              <p className="text-xs text-[#8a8a9a]">{status === 'done' ? 'Complete' : status === 'error' ? 'Failed' : 'Stack: ' + name}</p>
             </div>
           </div>
-          {status !== 'updating' && (
-            <button onClick={onClose} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800/50 transition-all">
-              <X className="w-4 h-4" />
-            </button>
-          )}
+          {status !== 'updating' && <button onClick={onClose} className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><X className="w-4 h-4" /></button>}
         </div>
-        <div className="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-surface-950 rounded-b-2xl">
-          {lines.length === 0 && (
-            <div className="text-surface-600 italic">Waiting for output...</div>
-          )}
+        <div className="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-[#0b0b10] rounded-b-xl">
+          {lines.length === 0 && <div className="text-[#5a5a6a] italic">Waiting for output...</div>}
           {lines.map((line, i) => (
-            <div key={i} className={`${
-              line.type === 'error' ? 'text-red-400' :
-              line.type === 'done' ? 'text-emerald-400 font-semibold' :
-              line.type === 'phase' ? 'text-accent-400 font-semibold' :
-              'text-surface-400'
-            }`}>
-              {line.text}
-            </div>
+            <div key={i} className={`${line.type === 'error' ? 'text-red-400' : line.type === 'done' ? 'text-emerald-400 font-semibold' : line.type === 'phase' ? 'text-accent-400 font-semibold' : 'text-[#8a8a9a]'}`}>{line.text}</div>
           ))}
-          {status === 'updating' && (
-            <span className="inline-block w-2 h-4 bg-surface-400 animate-pulse ml-0.5" />
-          )}
+          {status === 'updating' && <span className="inline-block w-1.5 h-3 bg-[#8a8a9a] animate-pulse ml-0.5" />}
           <div ref={endRef} />
         </div>
       </div>

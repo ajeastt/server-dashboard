@@ -8,8 +8,7 @@ export default function Networks() {
   const [message, setMessage] = useState('')
 
   const fetch = useCallback(async () => {
-    try { setNetworks(await api.docker.networks()) }
-    catch (err) { console.error(err) }
+    try { setNetworks(await api.docker.networks()) } catch (err) { console.error(err) }
     finally { setLoading(false) }
   }, [])
 
@@ -17,73 +16,54 @@ export default function Networks() {
 
   const handleRemove = async (id) => {
     if (!confirm('Remove this network?')) return
-    try { await api.docker.removeNetwork(id); fetch() }
-    catch (err) { setMessage(err.message) }
+    try { await api.docker.removeNetwork(id); fetch() } catch (err) { setMessage(err.message) }
   }
 
   const handlePrune = async () => {
     if (!confirm('Remove all unused networks?')) return
-    try { await api.docker.pruneNetworks(); setMessage('Pruned unused networks'); fetch() }
-    catch (err) { setMessage(err.message) }
+    try { await api.docker.pruneNetworks(); setMessage('Pruned unused networks'); fetch() } catch (err) { setMessage(err.message) }
   }
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-surface-100 tracking-tight">Networks</h1>
+        <h1 className="page-title">Networks</h1>
         <div className="flex items-center gap-2">
-          <button onClick={handlePrune} className="px-3 py-2 text-sm font-medium rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all">
-            <RefreshCw className="w-4 h-4" /> Prune
-          </button>
-          <button onClick={fetch} className="btn-secondary">
-            <RefreshCw className="w-4 h-4" /> Refresh
-          </button>
+          <button onClick={handlePrune} className="px-3 py-1.5 text-sm font-medium rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all"><RefreshCw className="w-3.5 h-3.5" /> Prune</button>
+          <button onClick={fetch} className="btn-secondary"><RefreshCw className="w-4 h-4" /> Refresh</button>
         </div>
       </div>
 
-      {message && (
-        <div className="p-3 rounded-xl bg-accent-500/10 border border-accent-500/20 text-sm text-accent-400">{message}</div>
-      )}
+      {message && <div className="p-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm text-accent-400">{message}</div>}
 
       {loading ? (
-        <div className="flex items-center justify-center h-64">
-          <div className="text-surface-500 text-sm">Loading networks...</div>
-        </div>
+        <div className="flex items-center justify-center h-64 text-sm text-[#8a8a9a]">Loading networks...</div>
       ) : networks.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 gap-3">
-          <Share2 className="w-12 h-12 text-surface-700" />
-          <div className="text-surface-500 text-sm">No networks found.</div>
-        </div>
+        <div className="flex flex-col items-center justify-center h-64 gap-3"><Share2 className="w-10 h-10 text-[#5a5a6a]" /><p className="text-sm text-[#8a8a9a]">No networks found.</p></div>
       ) : (
         <div className="card overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-surface-800/40 text-surface-500 text-xs uppercase tracking-wider">
-                  <th className="text-left py-3 px-4 font-semibold">Name</th>
-                  <th className="text-left py-3 px-4 font-semibold">Driver</th>
-                  <th className="text-center py-3 px-4 font-semibold">Containers</th>
-                  <th className="text-right py-3 px-4 font-semibold">Actions</th>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-base-700/30">
+                <th className="table-header">Name</th>
+                <th className="table-header">Driver</th>
+                <th className="table-header text-center">Containers</th>
+                <th className="table-header text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {networks.map((n) => (
+                <tr key={n.id} className="border-b border-base-700/20 hover:bg-white/[0.02] transition-colors">
+                  <td className="table-cell text-[#e4e4ed] font-medium">{n.name}</td>
+                  <td className="table-cell"><span className="badge bg-[#1e1e2c] text-[#8a8a9a] font-mono">{n.driver}</span></td>
+                  <td className="table-cell text-center text-[#8a8a9a]">{n.containers}</td>
+                  <td className="table-cell text-right">
+                    <button onClick={() => handleRemove(n.id)} className="p-1 rounded text-[#5a5a6a] hover:text-red-400 hover:bg-red-500/10 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {networks.map((n) => (
-                  <tr key={n.id} className="border-b border-surface-800/20 hover:bg-surface-800/20 transition-colors">
-                    <td className="py-3 px-4 text-surface-200 font-medium">{n.name}</td>
-                    <td className="py-3 px-4">
-                      <span className="badge-slate font-mono">{n.driver}</span>
-                    </td>
-                    <td className="py-3 px-4 text-center text-surface-400">{n.containers}</td>
-                    <td className="py-3 px-4 text-right">
-                      <button onClick={() => handleRemove(n.id)} className="btn-ghost p-1.5 text-surface-500 hover:text-red-400 hover:bg-red-500/10" title="Remove">
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

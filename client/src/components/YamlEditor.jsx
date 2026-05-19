@@ -27,9 +27,9 @@ export default function YamlEditor({ value, onChange, placeholder, minHeight = '
         EditorView.theme({
           '&': { fontFamily: 'var(--font-mono, ui-monospace, SFMono-Regular, monospace)', fontSize: '13px' },
           '.cm-scroller': { minHeight },
-          '.cm-editor': { borderRadius: '0.5rem', border: '1px solid hsl(223, 12%, 20%)' },
-          '.cm-focused': { outline: 'none', border: '1px solid hsl(239, 84%, 55%)' },
-          '.cm-gutters': { borderRight: '1px solid hsl(223, 12%, 18%)' },
+          '.cm-editor': { borderRadius: '0.5rem', border: '1px solid rgba(30, 30, 44, 0.6)' },
+          '.cm-focused': { outline: 'none', border: '1px solid rgba(6, 182, 212, 0.4)' },
+          '.cm-gutters': { borderRight: '1px solid rgba(30, 30, 44, 0.4)' },
         }),
       ],
     })

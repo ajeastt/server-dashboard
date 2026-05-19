@@ -7,31 +7,17 @@ export default {
   theme: {
     extend: {
       colors: {
-        surface: {
-          50: '#f6f6f9',
-          100: '#e6e6ef',
-          200: '#cfcfdf',
-          300: '#aeaecc',
-          400: '#8b8bb3',
-          500: '#6e6e99',
-          600: '#5a5a80',
-          700: '#4c4c6a',
-          800: '#34344a',
-          850: '#252538',
-          900: '#181825',
-          950: '#0d0d14',
+        base: {
+          950: '#0b0b10',
+          900: '#12121a',
+          800: '#181822',
+          700: '#1e1e2c',
+          600: '#2a2a3a',
         },
         accent: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          200: '#c7d2fe',
-          300: '#a5b4fc',
-          400: '#818cf8',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
-          800: '#3730a3',
-          900: '#312e81',
+          400: '#22d3ee',
+          500: '#06b6d4',
+          600: '#0891b2',
         },
       },
       fontFamily: {
@@ -39,10 +25,8 @@ export default {
         sans: ['Inter', 'system-ui', 'sans-serif'],
       },
       animation: {
-        'fade-in': 'fadeIn 0.4s ease-out',
-        'slide-up': 'slideUp 0.35s ease-out',
-        'scale-in': 'scaleIn 0.25s ease-out',
-        'pulse-soft': 'pulseSoft 2s ease-in-out infinite',
+        'fade-in': 'fadeIn 0.3s ease-out',
+        'slide-up': 'slideUp 0.3s ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -50,16 +34,8 @@ export default {
           '100%': { opacity: '1' },
         },
         slideUp: {
-          '0%': { opacity: '0', transform: 'translateY(12px)' },
+          '0%': { opacity: '0', transform: 'translateY(8px)' },
           '100%': { opacity: '1', transform: 'translateY(0)' },
-        },
-        scaleIn: {
-          '0%': { opacity: '0', transform: 'scale(0.95)' },
-          '100%': { opacity: '1', transform: 'scale(1)' },
-        },
-        pulseSoft: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.5' },
         },
       },
     },
