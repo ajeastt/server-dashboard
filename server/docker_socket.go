@@ -748,7 +748,7 @@ func listStacks() ([]StackResp, error) {
 }
 
 func deployStack(name, content string) error {
-	dir := fmt.Sprintf("/tmp/stacks/%s", name)
+	dir := fmt.Sprintf("/opt/stacks/%s", name)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
