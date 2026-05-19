@@ -12,11 +12,11 @@ import (
 )
 
 type unifiClient struct {
-	baseURL    string
-	username   string
-	password   string
-	client     *http.Client
-	apiPrefix  string
+	baseURL  string
+	username string
+	password string
+	client   *http.Client
+	api      string // API prefix for data endpoints, e.g. "/api" or "/proxy/network/api"
 }
 
 func newUnifiClient(cfg *UniFiConfig) *unifiClient {
@@ -36,41 +36,20 @@ func newUnifiClient(cfg *UniFiConfig) *unifiClient {
 	}
 }
 
-// tryLogin attempts to log in with the given API prefix path.
-// Returns true on success.
-func (u *unifiClient) tryLogin(prefix string) bool {
-	body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
-	req, err := http.NewRequest("POST", u.baseURL+prefix+"/login", strings.NewReader(body))
-	if err != nil {
-		return false
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return false
-	}
-	defer resp.Body.Close()
-	return resp.StatusCode == 200
+// loginAttemp describes one authentication strategy to try.
+type loginAttemp struct {
+	login    string // full login path (without baseURL)
+	api      string // API prefix for subsequent data calls
+	label    string // for error messages
 }
 
 func (u *unifiClient) login() error {
-	if u.apiPrefix != "" {
-		body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
-		req, _ := http.NewRequest("POST", u.baseURL+u.apiPrefix+"/login", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := u.client.Do(req)
-		if err != nil {
-			return err
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != 200 {
-			body, _ := io.ReadAll(resp.Body)
-			return fmt.Errorf("login failed (HTTP %d): %s", resp.StatusCode, string(body))
-		}
-		return nil
+	if u.api != "" {
+		// Already detected — just re-login with the stored credentials.
+		return u.reLogin()
 	}
 
-	// First check if the host is reachable at all
+	// First check if the host is reachable at all.
 	testReq, err := http.NewRequest("GET", u.baseURL+"/", nil)
 	if err == nil {
 		testResp, testErr := u.client.Do(testReq)
@@ -80,41 +59,77 @@ func (u *unifiClient) login() error {
 		testResp.Body.Close()
 	}
 
-	// Auto-detect API path: try classic first, then UniFi OS proxy path
-	attempts := []struct {
-		prefix string
-		label  string
-	}{{"/api", "classic"}, {"/proxy/network/api", "UniFi OS"}}
+	// Try strategies in order.
+	// Standalone controller:  login /api/login        → data /api/...
+	// UniFi OS (UDM Pro):     login /api/auth/login   → data /proxy/network/api/...
+	attempts := []loginAttemp{
+		{"/api/login", "/api", "classic"},
+		{"/api/auth/login", "/proxy/network/api", "UniFi OS"},
+	}
 
 	for _, a := range attempts {
-		body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
-		req, _ := http.NewRequest("POST", u.baseURL+a.prefix+"/login", strings.NewReader(body))
-		req.Header.Set("Content-Type", "application/json")
-		resp, err := u.client.Do(req)
+		code, err := u.tryLogin(a.login)
 		if err != nil {
 			continue
 		}
-		if resp.StatusCode == 200 {
-			u.apiPrefix = a.prefix
-			resp.Body.Close()
+		if code == 200 {
+			u.api = a.api
 			return nil
 		}
-		resp.Body.Close()
-		if resp.StatusCode == 401 {
-			return fmt.Errorf("wrong username or password (tried %s API at %s%s/login)", a.label, u.baseURL, a.prefix)
+		if code == 401 {
+			return fmt.Errorf("wrong username or password (tried %s at %s%s)", a.label, u.baseURL, a.login)
 		}
 	}
-	return fmt.Errorf("could not find UniFi API at %s (tried /api and /proxy/network/api)", u.baseURL)
+	return fmt.Errorf("could not find UniFi API at %s (tried /api/login and /api/auth/login)", u.baseURL)
+}
+
+func (u *unifiClient) tryLogin(path string) (int, error) {
+	body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
+	req, err := http.NewRequest("POST", u.baseURL+path, strings.NewReader(body))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := u.client.Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode, nil
+}
+
+func (u *unifiClient) reLogin() error {
+	// Determine the login path from the API prefix.
+	// Standalone:  api="/api"   → login="/api/login"
+	// UniFi OS:    api="/proxy/network/api" → login="/api/auth/login"
+	loginPath := u.api + "/login"
+	if strings.Contains(u.api, "proxy") {
+		loginPath = "/api/auth/login"
+	}
+
+	body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
+	req, _ := http.NewRequest("POST", u.baseURL+loginPath, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := u.client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != 200 {
+		respBody, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("re-login failed (HTTP %d): %s", resp.StatusCode, string(respBody))
+	}
+	return nil
 }
 
 func (u *unifiClient) get(path string) ([]byte, error) {
-	if u.apiPrefix == "" {
+	if u.api == "" {
 		if err := u.login(); err != nil {
 			return nil, err
 		}
 	}
 
-	fullPath := u.apiPrefix + path
+	fullPath := u.api + path
 	req, err := http.NewRequest("GET", u.baseURL+fullPath, nil)
 	if err != nil {
 		return nil, err
@@ -127,7 +142,7 @@ func (u *unifiClient) get(path string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == 401 {
-		if err := u.login(); err != nil {
+		if err := u.reLogin(); err != nil {
 			return nil, err
 		}
 		req, _ = http.NewRequest("GET", u.baseURL+fullPath, nil)
@@ -173,16 +188,16 @@ type uniFiHealthResp struct {
 		RC string `json:"rc"`
 	} `json:"meta"`
 	Data []struct {
-		Status              string `json:"status"`
-		NumSta              int    `json:"num_sta"`
-		NumUser             int    `json:"num_user"`
-		NumGuest            int    `json:"num_guest"`
-		NumWifi             int    `json:"num_wifi"`
-		WANIP               string `json:"wan_ip"`
-		WANGateway          string `json:"wan_gateway"`
-		Internet            string `json:"internet"`
-		LANSubnet           string `json:"lan_subnet"`
-		SysUpTime           int64  `json:"sys_uptime"`
+		Status        string `json:"status"`
+		NumSta        int    `json:"num_sta"`
+		NumUser       int    `json:"num_user"`
+		NumGuest      int    `json:"num_guest"`
+		NumWifi       int    `json:"num_wifi"`
+		WANIP         string `json:"wan_ip"`
+		WANGateway    string `json:"wan_gateway"`
+		Internet      string `json:"internet"`
+		LANSubnet     string `json:"lan_subnet"`
+		SysUpTime     int64  `json:"sys_uptime"`
 	} `json:"data"`
 }
 
