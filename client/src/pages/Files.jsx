@@ -1,14 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Folder, FileText, Link as LinkIcon, FileUp, ChevronRight, Home, X, RefreshCw, ArrowLeft } from 'lucide-react'
+import { Folder, FileText, Link as LinkIcon, FileUp, ChevronRight, X, RefreshCw, ArrowLeft } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatBytes } from '../lib/utils'
-
-const bookmarks = [
-  { path: '/', label: '/' },
-  { path: '/opt/stacks', label: 'Stacks' },
-  { path: '/opt/server-dashboard', label: 'ServerDash' },
-  { path: '/opt/dockge', label: 'Dockge' },
-]
 
 export default function Files() {
   const [currentPath, setCurrentPath] = useState('/')
@@ -88,24 +81,6 @@ export default function Files() {
         <button onClick={() => navigate(currentPath)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all">
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
-      </div>
-
-      {/* Bookmarks */}
-      <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-surface-500 font-medium uppercase tracking-wider mr-1">Jump:</span>
-        {bookmarks.map((b) => (
-          <button
-            key={b.path}
-            onClick={() => navigate(b.path)}
-            className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-all ${
-              currentPath === b.path
-                ? 'bg-accent-500/10 text-accent-400'
-                : 'bg-surface-800 text-surface-400 hover:text-surface-200 hover:bg-surface-700'
-            }`}
-          >
-            {b.label}
-          </button>
-        ))}
       </div>
 
       {/* Breadcrumb */}
