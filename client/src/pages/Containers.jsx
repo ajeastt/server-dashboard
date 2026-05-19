@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader } from 'lucide-react'
+import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Loader, Download } from 'lucide-react'
 import { api } from '../lib/api'
 import ContainerCard from '../components/ContainerCard'
 
@@ -88,12 +88,26 @@ export default function Containers() {
     }
   }
 
+  const [updating, setUpdating] = useState(null)
+
   const handleRestartStack = async (name) => {
     try {
       await api.docker.restartStack(name)
       fetchAll()
     } catch (err) {
       console.error('Failed to restart stack:', err)
+    }
+  }
+
+  const handleUpdateStack = async (name) => {
+    setUpdating(name)
+    try {
+      await api.docker.updateStack(name)
+      fetchAll()
+    } catch (err) {
+      console.error('Failed to update stack:', err)
+    } finally {
+      setUpdating(null)
     }
   }
 
@@ -214,6 +228,9 @@ export default function Containers() {
                     <span className="text-xs text-surface-500">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
                   </button>
                   <div className="flex items-center gap-1 shrink-0">
+                    <button onClick={() => handleUpdateStack(stack.name)} disabled={updating === stack.name} className="p-1.5 rounded-lg text-surface-500 hover:text-accent-400 hover:bg-accent-500/10 transition-all disabled:opacity-50" title="Update all images">
+                      {updating === stack.name ? <Loader className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    </button>
                     <button onClick={() => handleRestartStack(stack.name)} className="p-1.5 rounded-lg text-surface-500 hover:text-emerald-400 hover:bg-emerald-500/10 transition-all" title="Restart stack">
                       <RefreshCw className="w-4 h-4" />
                     </button>

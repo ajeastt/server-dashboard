@@ -1,5 +1,6 @@
 import Docker from 'dockerode';
 import { spawn } from 'child_process';
+import path from 'path';
 
 const docker = new Docker();
 
@@ -325,10 +326,36 @@ export async function getStackCompose(name) {
 export async function updateStackCompose(name, yaml) {
   const fs = await import('fs');
   const dir = `/tmp/stacks/${name}`;
-  const path = `${dir}/docker-compose.yml`;
+  const filePath = `${dir}/docker-compose.yml`;
   await fs.promises.mkdir(dir, { recursive: true });
-  await fs.promises.writeFile(path, yaml);
+  await fs.promises.writeFile(filePath, yaml);
   const { execSync } = await import('child_process');
-  execSync(`docker compose -p ${name} -f ${path} up -d`, { cwd: dir, stdio: 'pipe' });
+  execSync(`docker compose -p ${name} -f ${filePath} up -d`, { cwd: dir, stdio: 'pipe' });
   return { success: true, name };
+}
+
+async function getStackComposeDir(name) {
+  const containers = await docker.listContainers({ all: true });
+  for (const c of containers) {
+    const labels = c.Labels || {};
+    if (labels['com.docker.compose.project'] === name) {
+      const configFiles = labels['com.docker.compose.project.config_files'];
+      if (configFiles) {
+        return path.dirname(configFiles.split(',')[0].trim());
+      }
+    }
+  }
+  return `/tmp/stacks/${name}`;
+}
+
+export async function updateStackImages(name) {
+  const { execSync } = await import('child_process');
+  const dir = await getStackComposeDir(name);
+  try {
+    execSync(`docker compose -p ${name} pull 2>&1`, { cwd: dir, stdio: 'pipe', timeout: 300000 });
+    execSync(`docker compose -p ${name} up -d 2>&1`, { cwd: dir, stdio: 'pipe', timeout: 120000 });
+    return { success: true, name };
+  } catch (err) {
+    throw new Error(`Failed to update stack "${name}": ${err.message}`);
+  }
 }
