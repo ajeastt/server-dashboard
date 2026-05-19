@@ -447,4 +447,43 @@ func handleStackUpdateStream(c *fiber.Ctx) error {
 	return nil
 }
 
+// ── Docker events stream (SSE) ──
+
+func handleDockerEvents(c *fiber.Ctx) error {
+	sse, err := newSSE(c)
+	if err != nil {
+		return err
+	}
+
+	conn, err := net.Dial("unix", "/var/run/docker.sock")
+	if err != nil {
+		sse.Error(err.Error())
+		return nil
+	}
+	defer conn.Close()
+
+	req := "GET /events?since=0 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
+	conn.Write([]byte(req))
+
+	br := bufio.NewReader(conn)
+	for {
+		line, err := br.ReadString('\n')
+		if err != nil {
+			break
+		}
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		var evt map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &evt); err != nil {
+			continue
+		}
+		if err := sse.Event("", evt); err != nil {
+			break
+		}
+	}
+	return nil
+}
+
 

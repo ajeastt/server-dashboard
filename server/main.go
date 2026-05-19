@@ -70,6 +70,7 @@ func main() {
 	d.Delete("/stacks/:name", handleDestroyStack)
 	d.Get("/stacks/:name/compose", handleGetStackCompose)
 	d.Put("/stacks/:name/compose", handleUpdateStackCompose)
+	d.Get("/events", handleDockerEvents)
 
 	// ── Files ──
 	f := app.Group("/api/files")
