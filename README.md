@@ -1,81 +1,60 @@
 # Server Dashboard
 
-A self-hosted dashboard with Docker container management, Docker Compose stack deployment, and real-time system monitoring — all in one clean, modern dark-themed UI.
+A self-hosted dashboard for Docker container management, Compose stack deployment, and real-time system monitoring.
 
-## Features
-
-- **Dashboard** — Live CPU, memory, disk, and network graphs (WebSocket real-time)
-- **Containers** — List, search, filter, start/stop/restart/pause containers with per-container stats, logs (from startup), and built-in terminal
-- **Stacks** — Auto-discovers existing Docker Compose stacks, deploy new ones from YAML in the UI, edit with syntax highlighting, restart, destroy, update all images
-- **Volumes** — List with disk mounts, create/remove/prune Docker volumes
-- **Networks** — List, remove, prune Docker networks
-- **File Browser** — Browse host filesystem, preview files
-- **System Info** — Hostname, OS, kernel, uptime, CPU details
-- **Prune** — Prune unused images or full system prune with space-reclaimed stats
-
-## Quick Install
-
-**Requirements:** Docker 20+ and Docker Compose V2 on a Linux server.
+## Quick Install (one-liner)
 
 ```bash
 curl -sSL https://raw.githubusercontent.com/ajeastt/server-dashboard/main/install.sh | sudo bash
 ```
 
-Open `http://your-server:3001`.
+Opens at `http://your-server:3001`.
 
-### Custom port or directory
+Custom port: `curl ... | sudo bash -s -- -p 8080`
 
-```bash
-curl -sSL https://raw.githubusercontent.com/ajeastt/server-dashboard/main/install.sh | sudo bash -s -- -p 8080 -d /opt/dash
-```
-
-## Manual Setup
+## Manual Install
 
 ```bash
 mkdir -p /opt/server-dashboard && cd /opt/server-dashboard
 curl -sSL https://raw.githubusercontent.com/ajeastt/server-dashboard/main/compose.yaml --output compose.yaml
-docker compose pull && docker compose up -d
+docker compose pull
+docker compose up -d
 ```
 
 ## Updating
 
 ```bash
-cd /opt/server-dashboard
-sudo git pull
-sudo docker compose pull && sudo docker compose up -d
+# Git install (what the script does):
+cd /opt/server-dashboard && sudo git pull && sudo docker compose pull && sudo docker compose up -d
+
+# Manual install:
+cd /opt/server-dashboard && curl -sSL https://raw.githubusercontent.com/ajeastt/server-dashboard/main/compose.yaml --output compose.yaml && sudo docker compose pull && sudo docker compose up -d
 ```
 
-Or if you used the manual setup (no git repo):
+## What it does
 
-```bash
-cd /opt/server-dashboard
-curl -sSL https://raw.githubusercontent.com/ajeastt/server-dashboard/main/compose.yaml --output compose.yaml
-sudo docker compose pull && sudo docker compose up -d
-```
+Adds these volumes to the container so it can manage your system:
+
+- `/var/run/docker.sock` — Docker API access
+- `/opt/stacks` — Docker Compose stack files (Dockge-compatible)
+- `/` at `/host` — System monitoring and file browser
+- `/opt/server-dashboard` — Config access
 
 ## Development
 
 ```bash
 git clone https://github.com/ajeastt/server-dashboard.git
-cd server-dashboard
-
-# Frontend
-cd client && npm install && npm run dev
-
-# Backend (in another terminal)
-cd server && go run .
+cd server-dashboard/client && npm install && npm run dev   # frontend :5173
+cd server-dashboard/server && go run .                     # backend  :3001
 ```
 
-- Frontend: http://localhost:5173
-- Backend: http://localhost:3001
+## Tech
 
-## Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React, Vite, Tailwind CSS, Recharts, Lucide icons, CodeMirror 6, xterm.js |
-| Backend | Go, Fiber, gopsutil, gorilla/websocket |
-| Container | Docker Engine API (direct Unix socket), Docker Compose CLI |
+| Layer | |
+|-------|------|
+| Frontend | React, Vite, Tailwind, Recharts, CodeMirror, xterm.js |
+| Backend | Go, Fiber, gopsutil |
+| Deploy | GitHub Container Registry (`ghcr.io/ajeastt/server-dashboard`) |
 
 ## License
 
