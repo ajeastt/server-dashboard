@@ -798,6 +798,22 @@ func destroyStack(name string) error {
 	return nil
 }
 
+func stackComposeDir(name string) string {
+	paths := []string{
+		fmt.Sprintf("/opt/stacks/%s", name),
+		fmt.Sprintf("/tmp/stacks/%s", name),
+	}
+	for _, p := range paths {
+		if fi, err := os.Stat(filepath.Join(p, "docker-compose.yml")); err == nil && !fi.IsDir() {
+			return p
+		}
+		if fi, err := os.Stat(filepath.Join(p, "compose.yaml")); err == nil && !fi.IsDir() {
+			return p
+		}
+	}
+	return fmt.Sprintf("/tmp/stacks/%s", name)
+}
+
 func getStackComposeDir(name string) (string, error) {
 	b, err := dockerGet("/containers/json?all=true&filters=" + urlEncodeJSON(fmt.Sprintf(`{"label":{"com.docker.compose.project":["%s"]}}`, name)))
 	if err == nil {
@@ -810,7 +826,7 @@ func getStackComposeDir(name string) (string, error) {
 			}
 		}
 	}
-	return fmt.Sprintf("/tmp/stacks/%s", name), nil
+	return stackComposeDir(name), nil
 }
 
 func readStackCompose(name string) (string, error) {
@@ -828,28 +844,25 @@ func readStackCompose(name string) (string, error) {
 			}
 		}
 	}
-	content, err := os.ReadFile(fmt.Sprintf("/tmp/stacks/%s/docker-compose.yml", name))
+	dir := stackComposeDir(name)
+	content, err := os.ReadFile(filepath.Join(dir, "docker-compose.yml"))
 	if err != nil {
-		return "", fmt.Errorf("Cannot read compose config for stack %q: %v", name, err)
+		content, err = os.ReadFile(filepath.Join(dir, "compose.yaml"))
+		if err != nil {
+			return "", fmt.Errorf("Cannot read compose config for stack %q: %v", name, err)
+		}
 	}
 	return string(content), nil
 }
 
 func writeStackCompose(name, content string) error {
-	dir := fmt.Sprintf("/tmp/stacks/%s", name)
+	dir := stackComposeDir(name)
 	if err := os.MkdirAll(dir, 0755); err != nil {
-		return err
+		dir = fmt.Sprintf("/tmp/stacks/%s", name)
+		os.MkdirAll(dir, 0755)
 	}
 	fpath := filepath.Join(dir, "docker-compose.yml")
-	if err := os.WriteFile(fpath, []byte(content), 0644); err != nil {
-		return err
-	}
-	cmd := exec.Command("docker", "compose", "-p", name, "-f", fpath, "up", "-d")
-	cmd.Dir = dir
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%s: %s", strings.TrimSpace(err.Error()), strings.TrimSpace(string(out)))
-	}
-	return nil
+	return os.WriteFile(fpath, []byte(content), 0644)
 }
 
 func urlEncodeJSON(s string) string {
