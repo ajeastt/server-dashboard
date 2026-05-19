@@ -103,11 +103,3 @@ export function connectMetrics(callback) {
   ws.send({ type: 'subscribe', channel: 'metrics' });
   return () => { ws.send({ type: 'unsubscribe', channel: 'metrics' }); ws.close(); };
 }
-
-export function connectDockerEvents(callback) {
-  const es = new EventSource(`${API}/docker/events`);
-  es.onmessage = (e) => {
-    try { callback(JSON.parse(e.data)); } catch {}
-  };
-  return () => es.close();
-}
