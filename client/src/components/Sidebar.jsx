@@ -9,6 +9,7 @@ import {
   Eraser,
   Check,
   Loader,
+  FolderTree,
 } from 'lucide-react'
 import { api } from '../lib/api'
 
@@ -17,6 +18,7 @@ const links = [
   { to: '/containers', label: 'Containers', icon: Container },
   { to: '/volumes', label: 'Volumes', icon: HardDrive },
   { to: '/networks', label: 'Networks', icon: Share2 },
+  { to: '/files', label: 'Files', icon: FolderTree },
 ]
 
 export default function Sidebar() {

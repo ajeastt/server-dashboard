@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import { dockerRouter } from './routes/docker.js';
 import { systemRouter } from './routes/system.js';
 import { monitoringRouter } from './routes/monitoring.js';
+import { filesRouter } from './routes/files.js';
 import { startMetricsStream } from './services/monitoring.js';
 import { createExec, streamContainerLogs } from './services/docker.js';
 
@@ -22,6 +23,7 @@ app.use(express.json());
 app.use('/api/docker', dockerRouter);
 app.use('/api/system', systemRouter);
 app.use('/api/monitoring', monitoringRouter);
+app.use('/api/files', filesRouter);
 
 const clientDist = path.join(__dirname, '..', '..', 'client', 'dist');
 app.use(express.static(clientDist));

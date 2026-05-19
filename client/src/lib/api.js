@@ -55,6 +55,10 @@ export const api = {
 
     prune: () => fetchJson('/docker/prune', { method: 'POST' }),
   },
+  files: {
+    list: (path = '/') => fetchJson(`/files/list?path=${encodeURIComponent(path)}`),
+    read: (path) => fetchJson(`/files/read?path=${encodeURIComponent(path)}`),
+  },
 };
 
 // ── WebSocket connection with message dispatch ──
