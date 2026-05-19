@@ -359,3 +359,23 @@ export async function updateStackImages(name) {
     throw new Error(`Failed to update stack "${name}": ${err.message}`);
   }
 }
+
+export async function updateStackImagesStream(name, onEvent) {
+  const { spawn } = await import('child_process');
+  const dir = await getStackComposeDir(name);
+
+  const run = (args) => new Promise((resolve, reject) => {
+    const proc = spawn('docker', ['compose', '-p', name, ...args], { cwd: dir });
+    proc.stdout.on('data', (chunk) => onEvent({ type: 'output', data: chunk.toString() }));
+    proc.stderr.on('data', (chunk) => onEvent({ type: 'output', data: chunk.toString() }));
+    proc.on('close', (code) => {
+      if (code === 0) resolve();
+      else reject(new Error(`docker compose ${args.join(' ')} exited with code ${code}`));
+    });
+    proc.on('error', reject);
+  });
+
+  await run(['pull']);
+  onEvent({ type: 'phase', phase: 'up' });
+  await run(['up', '-d']);
+}

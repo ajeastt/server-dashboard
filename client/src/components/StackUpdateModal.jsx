@@ -1,33 +1,40 @@
 import { useState, useEffect, useRef } from 'react'
 import { Terminal, X, CheckCircle, AlertCircle, Loader } from 'lucide-react'
 
-export default function PullProgressModal({ name, onClose, onDone }) {
+export default function StackUpdateModal({ name, onClose, onDone }) {
   const [lines, setLines] = useState([])
-  const [status, setStatus] = useState('pulling')
+  const [status, setStatus] = useState('updating')
+  const [phase, setPhase] = useState('pull')
   const endRef = useRef(null)
-  const evtSource = useRef(null)
 
   useEffect(() => {
-    const es = new EventSource(`/api/docker/images/pull-stream?name=${encodeURIComponent(name)}`)
-    evtSource.current = es
+    const es = new EventSource(`/api/docker/stacks/${encodeURIComponent(name)}/update-stream`)
 
     es.onmessage = (e) => {
       try {
         const obj = JSON.parse(e.data)
-        const line = formatProgress(obj)
-        if (line) setLines((prev) => [...prev, line])
+        if (obj.stream) {
+          const textLines = obj.stream.split('\n').filter(Boolean)
+          setLines((prev) => [...prev, ...textLines.map((t) => ({ text: t, type: 'output' }))])
+        }
       } catch {}
     }
 
+    es.addEventListener('phase', (e) => {
+      const d = JSON.parse(e.data)
+      setPhase(d.phase)
+      setLines((prev) => [...prev, { text: d.phase === 'up' ? '--- Restarting services ---' : '', type: 'phase' }])
+    })
+
     es.addEventListener('done', () => {
-      setLines((prev) => [...prev, { text: 'Pull complete', type: 'done' }])
+      setLines((prev) => [...prev, { text: 'Stack updated successfully', type: 'done' }])
       setStatus('done')
       es.close()
       if (onDone) onDone()
     })
 
     es.addEventListener('error', (e) => {
-      let msg = 'Pull failed'
+      let msg = 'Update failed'
       try { const d = JSON.parse(e.data); msg = d.error || msg } catch {}
       setLines((prev) => [...prev, { text: msg, type: 'error' }])
       setStatus('error')
@@ -35,7 +42,7 @@ export default function PullProgressModal({ name, onClose, onDone }) {
     })
 
     es.onerror = () => {
-      if (status === 'pulling') {
+      if (status === 'updating') {
         setLines((prev) => [...prev, { text: 'Connection lost', type: 'error' }])
         setStatus('error')
         es.close()
@@ -64,11 +71,15 @@ export default function PullProgressModal({ name, onClose, onDone }) {
                <Loader className="w-5 h-5 animate-spin" />}
             </div>
             <div>
-              <h2 className="text-sm font-semibold text-surface-200">Pulling {name}</h2>
-              <p className="text-xs text-surface-500">{status === 'done' ? 'Complete' : status === 'error' ? 'Failed' : 'Downloading...'}</p>
+              <h2 className="text-sm font-semibold text-surface-200">
+                {phase === 'up' ? 'Restarting services...' : 'Updating images...'}
+              </h2>
+              <p className="text-xs text-surface-500">
+                {status === 'done' ? 'Complete' : status === 'error' ? 'Failed' : 'Stack: ' + name}
+              </p>
             </div>
           </div>
-          {status !== 'pulling' && (
+          {status !== 'updating' && (
             <button onClick={onClose} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
               <X className="w-4 h-4" />
             </button>
@@ -82,14 +93,13 @@ export default function PullProgressModal({ name, onClose, onDone }) {
             <div key={i} className={`${
               line.type === 'error' ? 'text-red-400' :
               line.type === 'done' ? 'text-emerald-400 font-semibold' :
-              line.type === 'progress' ? 'text-accent-400' :
-              line.type === 'status' ? 'text-surface-300' :
+              line.type === 'phase' ? 'text-accent-400 font-semibold' :
               'text-surface-400'
             }`}>
               {line.text}
             </div>
           ))}
-          {status === 'pulling' && (
+          {status === 'updating' && (
             <span className="inline-block w-2 h-4 bg-surface-400 animate-pulse ml-0.5" />
           )}
           <div ref={endRef} />
@@ -97,34 +107,4 @@ export default function PullProgressModal({ name, onClose, onDone }) {
       </div>
     </div>
   )
-}
-
-function formatProgress(obj) {
-  if (!obj || !obj.status) return null
-
-  const { status, id, progress, progressDetail } = obj
-
-  if (status.startsWith('Pulling from') || status.startsWith('Digest:') || status.startsWith('Status:')) {
-    return { text: status, type: 'status' }
-  }
-
-  if (status === 'Image is up to date for ' + obj.id || status === 'Image is up to date') {
-    return { text: `✓ ${id || ''} Image is up to date`.trim(), type: 'done' }
-  }
-
-  if (status === 'Downloaded newer image') {
-    return { text: `✓ ${status}${id ? ' for ' + id : ''}`, type: 'done' }
-  }
-
-  if (status === 'Downloading' || status === 'Extracting' || status === 'Pull complete' || status === 'Already exists' || status === 'Waiting' || status === 'Verifying Checksum' || status === 'Download complete') {
-    const icon = status === 'Pull complete' || status === 'Already exists' ? '✓' :
-                 status === 'Downloading' || status === 'Extracting' ? ' ' : ' '
-    const pct = progressDetail?.current && progressDetail?.total
-      ? ` ${Math.round(progressDetail.current / progressDetail.total * 100)}%`
-      : ''
-    const bar = progress ? ` ${progress}` : ''
-    return { text: `${icon} ${id ? id + ' ' : ''}${status}${pct}${bar}`, type: status === 'Downloading' ? 'progress' : 'status' }
-  }
-
-  return { text: `${status}${id ? ' ' + id : ''}`, type: 'info' }
 }

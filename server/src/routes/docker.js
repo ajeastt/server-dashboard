@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import {
   listContainers, getContainer, getContainerStats, getContainerLogs, executeAction,
-  listStacks, deployStack, restartStack, destroyStack, getStackCompose, updateStackCompose, updateStackImages,
+  listStacks, deployStack, restartStack, destroyStack, getStackCompose, updateStackCompose, updateStackImages, updateStackImagesStream,
   listImages, pullImage, pullImageStream, checkImageUpdate, removeImage, pruneImages,
   listVolumes, removeVolume, pruneVolumes,
   listNetworks, removeNetwork, pruneNetworks,
@@ -145,6 +145,29 @@ dockerRouter.post('/stacks/:name/restart', async (req, res) => {
 dockerRouter.post('/stacks/:name/update', async (req, res) => {
   try { res.json(await updateStackImages(req.params.name)); }
   catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dockerRouter.get('/stacks/:name/update-stream', async (req, res) => {
+  const name = req.params.name;
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    Connection: 'keep-alive',
+  });
+  try {
+    await updateStackImagesStream(name, (event) => {
+      if (event.type === 'output') {
+        res.write(`data: ${JSON.stringify({ stream: event.data })}\n\n`);
+      } else if (event.type === 'phase') {
+        res.write(`event: phase\ndata: ${JSON.stringify({ phase: event.phase })}\n\n`);
+      }
+    });
+    res.write(`event: done\ndata: {}\n\n`);
+  } catch (err) {
+    res.write(`event: error\ndata: ${JSON.stringify({ error: err.message })}\n\n`);
+  } finally {
+    res.end();
+  }
 });
 
 dockerRouter.delete('/stacks/:name', async (req, res) => {
