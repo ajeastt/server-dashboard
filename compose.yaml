@@ -9,6 +9,7 @@ services:
       - /opt/stacks:/opt/stacks:ro
       - /opt/dockge:/opt/dockge:ro
       - /opt/server-dashboard:/opt/server-dashboard:ro
+      - /:/host:ro
     restart: unless-stopped
     environment:
       - PORT=3001
