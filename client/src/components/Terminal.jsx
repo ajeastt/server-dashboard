@@ -15,11 +15,11 @@ export default function Terminal({ containerId }) {
       fontSize: 13,
       fontFamily: '"JetBrains Mono", "SF Mono", "Fira Code", monospace',
       theme: {
-        background: '#020617',
+        background: '#0d0d14',
         foreground: '#e2e8f0',
         cursor: '#6366f1',
-        selectionBackground: '#334155',
-        black: '#0f172a',
+        selectionBackground: 'rgba(99, 102, 241, 0.3)',
+        black: '#181825',
         red: '#ef4444',
         green: '#22c55e',
         yellow: '#eab308',
@@ -84,7 +84,7 @@ export default function Terminal({ containerId }) {
   return (
     <div
       ref={termRef}
-      className="rounded-xl border border-surface-800 overflow-hidden"
+      className="rounded-2xl border border-surface-700/50 overflow-hidden"
       style={{ height: '480px' }}
     />
   )

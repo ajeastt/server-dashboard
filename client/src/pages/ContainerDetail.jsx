@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { ArrowLeft, Play, Square, RefreshCw, Terminal, ListX } from 'lucide-react'
+import { ArrowLeft, Play, Square, RefreshCw, Terminal, ListX, Cpu, HardDrive, Network } from 'lucide-react'
 import { api, createWS } from '../lib/api'
 import { formatBytes, stateColor } from '../lib/utils'
 import ResourceBar from '../components/ResourceBar'
@@ -71,7 +71,10 @@ export default function ContainerDetail() {
   if (!container) {
     return (
       <div className="flex items-center justify-center h-96">
-        <div className="text-surface-500 text-sm">Loading container...</div>
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-2 border-accent-500/30 border-t-accent-500 animate-spin" />
+          <div className="text-surface-500 text-sm">Loading container...</div>
+        </div>
       </div>
     )
   }
@@ -84,14 +87,15 @@ export default function ContainerDetail() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 animate-fade-in">
+      {/* Header */}
       <div className="flex items-center gap-4">
-        <Link to="/containers" className="p-2 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
+        <Link to="/containers" className="btn-ghost p-2">
           <ArrowLeft className="w-5 h-5" />
         </Link>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <h1 className="text-2xl font-bold text-surface-100 tracking-tight truncate">{name}</h1>
-            <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${statusColor} bg-surface-800/50`}>
+            <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-xl ${statusColor} bg-surface-800/40 border border-surface-700/20`}>
               <span className={`w-1.5 h-1.5 rounded-full ${state === 'running' ? 'bg-emerald-400 animate-pulse' : 'bg-surface-500'}`} />
               {state}
             </span>
@@ -100,21 +104,22 @@ export default function ContainerDetail() {
         </div>
         <div className="flex items-center gap-1.5">
           {state === 'running' ? (
-            <button onClick={() => handleAction('stop')} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-all">
+            <button onClick={() => handleAction('stop')} className="btn-danger px-3 py-2">
               <Square className="w-4 h-4" /> Stop
             </button>
           ) : (
-            <button onClick={() => handleAction('start')} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all">
+            <button onClick={() => handleAction('start')} className="px-3 py-2 text-sm font-medium rounded-xl bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 transition-all">
               <Play className="w-4 h-4" /> Start
             </button>
           )}
-          <button onClick={() => handleAction('restart')} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all">
+          <button onClick={() => handleAction('restart')} className="btn-secondary">
             <RefreshCw className="w-4 h-4" /> Restart
           </button>
         </div>
       </div>
 
-      <div className="flex gap-1.5 border-b border-surface-800">
+      {/* Tabs */}
+      <div className="flex gap-1 border-b border-surface-800/50">
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -133,34 +138,49 @@ export default function ContainerDetail() {
       </div>
 
       {activeTab === 'stats' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 animate-fade-in">
-          <div className="rounded-xl border border-surface-800 bg-surface-900 p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-surface-200">CPU</h3>
-            <ResourceBar label="Usage" percent={stats ? stats.cpuPercent : 0} color={stats?.cpuPercent > 80 ? 'red' : stats?.cpuPercent > 50 ? 'amber' : 'accent'} />
-            <p className="text-xs text-surface-500">{stats ? `${stats.cpuPercent}%` : 'N/A'}</p>
-          </div>
-          <div className="rounded-xl border border-surface-800 bg-surface-900 p-5 space-y-4">
-            <h3 className="text-sm font-semibold text-surface-200">Memory</h3>
-            <ResourceBar label="Usage" percent={stats ? stats.memPercent : 0} color={stats?.memPercent > 80 ? 'red' : stats?.memPercent > 50 ? 'amber' : 'emerald'} />
-            <p className="text-xs text-surface-500">{stats ? `${formatBytes(stats.memUsage)} / ${formatBytes(stats.memLimit)}` : 'N/A'}</p>
-          </div>
-          <div className="rounded-xl border border-surface-800 bg-surface-900 p-5 space-y-2">
-            <h3 className="text-sm font-semibold text-surface-200 mb-3">Network</h3>
-            <div className="flex justify-between text-sm">
-              <span className="text-surface-400">Received</span>
-              <span className="text-surface-200 font-medium">{stats ? formatBytes(stats.networkRx) : 'N/A'}</span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 animate-fade-in">
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-accent-500/10">
+                <Cpu className="w-4 h-4 text-accent-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-surface-200">CPU</h3>
             </div>
-            <div className="flex justify-between text-sm">
+            <ResourceBar label="Usage" percent={stats ? stats.cpuPercent : 0} color={stats?.cpuPercent > 80 ? 'red' : stats?.cpuPercent > 50 ? 'amber' : 'accent'} />
+            <p className="text-xs text-surface-500 font-mono">{stats ? `${stats.cpuPercent}%` : 'N/A'}</p>
+          </div>
+          <div className="card p-5 space-y-4">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-emerald-500/10">
+                <HardDrive className="w-4 h-4 text-emerald-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-surface-200">Memory</h3>
+            </div>
+            <ResourceBar label="Usage" percent={stats ? stats.memPercent : 0} color={stats?.memPercent > 80 ? 'red' : stats?.memPercent > 50 ? 'amber' : 'emerald'} />
+            <p className="text-xs text-surface-500 font-mono">{stats ? `${formatBytes(stats.memUsage)} / ${formatBytes(stats.memLimit)}` : 'N/A'}</p>
+          </div>
+          <div className="card p-5 space-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="p-2 rounded-xl bg-sky-500/10">
+                <Network className="w-4 h-4 text-sky-400" />
+              </div>
+              <h3 className="text-sm font-semibold text-surface-200">Network</h3>
+            </div>
+            <div className="flex justify-between text-sm py-2 border-b border-surface-800/30">
+              <span className="text-surface-400">Received</span>
+              <span className="text-surface-200 font-medium font-mono">{stats ? formatBytes(stats.networkRx) : 'N/A'}</span>
+            </div>
+            <div className="flex justify-between text-sm py-2">
               <span className="text-surface-400">Sent</span>
-              <span className="text-surface-200 font-medium">{stats ? formatBytes(stats.networkTx) : 'N/A'}</span>
+              <span className="text-surface-200 font-medium font-mono">{stats ? formatBytes(stats.networkTx) : 'N/A'}</span>
             </div>
           </div>
         </div>
       )}
 
       {activeTab === 'info' && (
-        <div className="rounded-xl border border-surface-800 bg-surface-900 p-5 animate-fade-in">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="card p-5 animate-fade-in">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
             {[
               ['ID', container.Id?.slice(0, 24)],
               ['Image', container.Config?.Image],
@@ -171,9 +191,9 @@ export default function ContainerDetail() {
               ['Restart Policy', container.HostConfig?.RestartPolicy?.Name],
               ['Network Mode', container.HostConfig?.NetworkMode],
             ].map(([label, value]) => (
-              <div key={label} className="space-y-1">
-                <p className="text-xs text-surface-500">{label}</p>
-                <p className="text-sm text-surface-200 font-mono break-all">{value || '—'}</p>
+              <div key={label} className="space-y-1.5">
+                <p className="text-[11px] font-semibold text-surface-500 uppercase tracking-wider">{label}</p>
+                <p className="text-sm text-surface-200 font-mono break-all">{value || <span className="text-surface-500">—</span>}</p>
               </div>
             ))}
           </div>
@@ -181,17 +201,18 @@ export default function ContainerDetail() {
       )}
 
       {activeTab === 'logs' && (
-        <div className="rounded-xl border border-surface-800 bg-surface-950 p-4 animate-fade-in">
-          <div className="flex items-center gap-2 mb-3 text-surface-400">
-            <ListX className="w-4 h-4" />
-            <span className="text-xs font-medium">Live Logs</span>
-            <span className="ml-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+        <div className="card overflow-hidden animate-fade-in">
+          <div className="flex items-center gap-2 px-5 py-3 bg-surface-900/40 border-b border-surface-800/30">
+            <ListX className="w-4 h-4 text-surface-400" />
+            <span className="text-xs font-medium text-surface-400">Live Logs</span>
+            <span className="ml-2 w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse-soft" />
           </div>
           <pre
             ref={logContainerRef}
-            className="text-xs font-mono leading-relaxed text-surface-300 whitespace-pre-wrap overflow-x-auto max-h-96 overflow-y-auto"
+            className="p-5 text-xs font-mono leading-relaxed text-surface-300 whitespace-pre-wrap overflow-x-auto overflow-y-auto"
+            style={{ maxHeight: '60vh' }}
           >
-            {liveLogs || 'Waiting for logs...'}
+            {liveLogs || <span className="text-surface-600 italic">Waiting for logs...</span>}
           </pre>
         </div>
       )}

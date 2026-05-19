@@ -88,11 +88,11 @@ export default function StackUpdateModal({ name, onClose, onDone }) {
   }, [lines])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-      <div className="w-full max-w-2xl mx-4 rounded-xl border border-surface-700 bg-surface-900 shadow-2xl animate-slide-up">
-        <div className="flex items-center justify-between p-4 border-b border-surface-800">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-2xl mx-4 rounded-2xl border border-surface-700/50 bg-surface-900/95 backdrop-blur-xl shadow-2xl animate-scale-in">
+        <div className="flex items-center justify-between p-4 border-b border-surface-800/50">
           <div className="flex items-center gap-3">
-            <div className={`p-1.5 rounded-lg ${
+            <div className={`p-1.5 rounded-xl ${
               status === 'done' ? 'bg-emerald-500/10 text-emerald-400' :
               status === 'error' ? 'bg-red-500/10 text-red-400' :
               'bg-accent-500/10 text-accent-400'
@@ -112,12 +112,12 @@ export default function StackUpdateModal({ name, onClose, onDone }) {
             </div>
           </div>
           {status !== 'updating' && (
-            <button onClick={onClose} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all">
+            <button onClick={onClose} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800/50 transition-all">
               <X className="w-4 h-4" />
             </button>
           )}
         </div>
-        <div className="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-surface-950 rounded-b-xl">
+        <div className="p-4 max-h-96 overflow-y-auto font-mono text-xs leading-relaxed bg-surface-950 rounded-b-2xl">
           {lines.length === 0 && (
             <div className="text-surface-600 italic">Waiting for output...</div>
           )}

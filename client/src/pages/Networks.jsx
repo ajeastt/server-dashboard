@@ -32,17 +32,17 @@ export default function Networks() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-100 tracking-tight">Networks</h1>
         <div className="flex items-center gap-2">
-          <button onClick={handlePrune} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all">
+          <button onClick={handlePrune} className="px-3 py-2 text-sm font-medium rounded-xl bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-all">
             <RefreshCw className="w-4 h-4" /> Prune
           </button>
-          <button onClick={fetch} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all">
+          <button onClick={fetch} className="btn-secondary">
             <RefreshCw className="w-4 h-4" /> Refresh
           </button>
         </div>
       </div>
 
       {message && (
-        <div className="p-3 rounded-lg bg-accent-500/10 border border-accent-500/20 text-sm text-accent-400">{message}</div>
+        <div className="p-3 rounded-xl bg-accent-500/10 border border-accent-500/20 text-sm text-accent-400">{message}</div>
       )}
 
       {loading ? (
@@ -55,27 +55,27 @@ export default function Networks() {
           <div className="text-surface-500 text-sm">No networks found.</div>
         </div>
       ) : (
-        <div className="rounded-xl border border-surface-800 bg-surface-900 overflow-hidden">
+        <div className="card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-surface-800 text-surface-500 text-xs uppercase tracking-wider">
-                  <th className="text-left py-3 px-4 font-medium">Name</th>
-                  <th className="text-left py-3 px-4 font-medium">Driver</th>
-                  <th className="text-center py-3 px-4 font-medium">Containers</th>
-                  <th className="text-right py-3 px-4 font-medium">Actions</th>
+                <tr className="border-b border-surface-800/40 text-surface-500 text-xs uppercase tracking-wider">
+                  <th className="text-left py-3 px-4 font-semibold">Name</th>
+                  <th className="text-left py-3 px-4 font-semibold">Driver</th>
+                  <th className="text-center py-3 px-4 font-semibold">Containers</th>
+                  <th className="text-right py-3 px-4 font-semibold">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {networks.map((n) => (
-                  <tr key={n.id} className="border-b border-surface-800/50 hover:bg-surface-800/30 transition-colors">
+                  <tr key={n.id} className="border-b border-surface-800/20 hover:bg-surface-800/20 transition-colors">
                     <td className="py-3 px-4 text-surface-200 font-medium">{n.name}</td>
                     <td className="py-3 px-4">
-                      <span className="px-2 py-0.5 text-xs rounded-md bg-surface-800 text-surface-400 font-mono">{n.driver}</span>
+                      <span className="badge-slate font-mono">{n.driver}</span>
                     </td>
                     <td className="py-3 px-4 text-center text-surface-400">{n.containers}</td>
                     <td className="py-3 px-4 text-right">
-                      <button onClick={() => handleRemove(n.id)} className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-all" title="Remove">
+                      <button onClick={() => handleRemove(n.id)} className="btn-ghost p-1.5 text-surface-500 hover:text-red-400 hover:bg-red-500/10" title="Remove">
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </td>

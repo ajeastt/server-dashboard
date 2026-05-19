@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Folder, FileText, Link as LinkIcon, FileUp, ChevronRight, X, RefreshCw, ArrowLeft } from 'lucide-react'
+import { Folder, FileText, Link as LinkIcon, ChevronRight, X, RefreshCw, ArrowLeft } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatBytes } from '../lib/utils'
 
@@ -78,7 +78,7 @@ export default function Files() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-surface-100 tracking-tight">Files</h1>
-        <button onClick={() => navigate(currentPath)} className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg bg-surface-800 text-surface-300 hover:bg-surface-700 transition-all">
+        <button onClick={() => navigate(currentPath)} className="btn-secondary">
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
       </div>
@@ -86,7 +86,7 @@ export default function Files() {
       {/* Breadcrumb */}
       <div className="flex items-center gap-1 text-sm text-surface-400 flex-wrap">
         {parent && currentPath !== '/' && (
-          <button onClick={() => navigate(parent)} className="p-1 rounded hover:bg-surface-800 text-surface-500 hover:text-surface-200 transition-all mr-1">
+          <button onClick={() => navigate(parent)} className="btn-ghost p-1 mr-1">
             <ArrowLeft className="w-4 h-4" />
           </button>
         )}
@@ -96,7 +96,7 @@ export default function Files() {
             {i === crumbs.length - 1 ? (
               <span className="text-surface-200 font-medium">{c.label}</span>
             ) : (
-              <button onClick={() => navigate(c.path)} className="hover:text-surface-200 transition-all hover:underline underline-offset-2">
+              <button onClick={() => navigate(c.path)} className="hover:text-surface-200 transition-all hover:underline underline-offset-2 decoration-surface-600">
                 {c.label}
               </button>
             )}
@@ -106,13 +106,13 @@ export default function Files() {
 
       {/* Error */}
       {error && (
-        <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">
+        <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-sm text-red-400">
           {error}
         </div>
       )}
 
       {/* File listing */}
-      <div className="rounded-xl border border-surface-800 bg-surface-900 overflow-hidden">
+      <div className="card overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
             <div className="text-surface-500 text-sm">Loading...</div>
@@ -126,20 +126,20 @@ export default function Files() {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-surface-800 text-xs text-surface-500 uppercase tracking-wider">
-                  <th className="text-left px-4 py-3 font-medium w-8"></th>
-                  <th className="text-left px-2 py-3 font-medium">Name</th>
-                  <th className="text-right px-4 py-3 font-medium w-20">Size</th>
-                  <th className="text-right px-4 py-3 font-medium w-32 hidden sm:table-cell">Modified</th>
-                  <th className="text-center px-4 py-3 font-medium w-24 hidden md:table-cell">Permissions</th>
+                <tr className="border-b border-surface-800/40 text-xs text-surface-500 uppercase tracking-wider">
+                  <th className="text-left px-4 py-3 font-semibold w-8"></th>
+                  <th className="text-left px-2 py-3 font-semibold">Name</th>
+                  <th className="text-right px-4 py-3 font-semibold w-20">Size</th>
+                  <th className="text-right px-4 py-3 font-semibold w-32 hidden sm:table-cell">Modified</th>
+                  <th className="text-center px-4 py-3 font-semibold w-24 hidden md:table-cell">Permissions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-800/50">
+              <tbody className="divide-y divide-surface-800/20">
                 {entries.map((entry) => (
                   <tr
                     key={entry.path}
                     onClick={() => handleDoubleClick(entry)}
-                    className="text-sm text-surface-300 hover:bg-surface-800/50 cursor-pointer transition-all"
+                    className="text-sm text-surface-300 hover:bg-surface-800/30 cursor-pointer transition-all"
                   >
                     <td className="px-4 py-3">
                       {entry.type === 'directory' ? (
@@ -154,7 +154,7 @@ export default function Files() {
                       {entry.name}
                       {entry.isSymlink && <span className="text-surface-500 text-xs ml-1">→</span>}
                     </td>
-                    <td className="px-4 py-3 text-right text-surface-400 whitespace-nowrap">
+                    <td className="px-4 py-3 text-right text-surface-400 whitespace-nowrap font-mono text-xs">
                       {entry.type === 'directory' ? '—' : formatBytes(entry.size)}
                     </td>
                     <td className="px-4 py-3 text-right text-surface-500 text-xs whitespace-nowrap hidden sm:table-cell">
@@ -173,27 +173,30 @@ export default function Files() {
 
       {/* File preview modal */}
       {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => { setPreviewFile(null); setPreviewContent(null) }}>
-          <div className="w-full max-w-4xl mx-4 rounded-xl border border-surface-700 bg-surface-900 shadow-2xl animate-slide-up overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-surface-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm" onClick={() => { setPreviewFile(null); setPreviewContent(null) }}>
+          <div className="w-full max-w-4xl mx-4 rounded-2xl border border-surface-700/50 bg-surface-900/95 backdrop-blur-xl shadow-2xl animate-scale-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-surface-800/50">
               <div className="flex items-center gap-2 min-w-0">
                 <FileText className="w-4 h-4 text-surface-400 shrink-0" />
                 <h2 className="text-sm font-semibold text-surface-200 truncate">{previewFile.path}</h2>
               </div>
-              <button onClick={() => { setPreviewFile(null); setPreviewContent(null) }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800 transition-all shrink-0">
+              <button onClick={() => { setPreviewFile(null); setPreviewContent(null) }} className="p-1.5 rounded-lg text-surface-500 hover:text-surface-200 hover:bg-surface-800/50 transition-all shrink-0">
                 <X className="w-4 h-4" />
               </button>
             </div>
             <div className="max-h-[70vh] overflow-y-auto">
               {previewLoading ? (
                 <div className="flex items-center justify-center h-48">
-                  <div className="text-surface-500 text-sm">Loading...</div>
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="w-6 h-6 rounded-full border-2 border-accent-500/30 border-t-accent-500 animate-spin" />
+                    <div className="text-surface-500 text-sm">Loading...</div>
+                  </div>
                 </div>
               ) : previewContent?.error ? (
                 <div className="p-5 text-sm text-red-400">{previewContent.error}</div>
               ) : previewContent?.binary ? (
                 <div className="flex flex-col items-center justify-center h-48 gap-3">
-                  <FileUp className="w-10 h-10 text-surface-700" />
+                  <Folder className="w-10 h-10 text-surface-700" />
                   <p className="text-sm text-surface-500">Binary file — preview not available</p>
                   <p className="text-xs text-surface-600">{formatBytes(previewFile.size)}</p>
                 </div>

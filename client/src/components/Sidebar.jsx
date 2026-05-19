@@ -5,10 +5,7 @@ import {
   Container,
   HardDrive,
   Share2,
-  Server,
   Eraser,
-  Check,
-  Loader,
   FolderTree,
 } from 'lucide-react'
 import { api } from '../lib/api'
@@ -66,27 +63,31 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="w-16 lg:w-56 border-r border-surface-800 bg-surface-900 flex flex-col shrink-0">
-        <div className="h-14 flex items-center gap-2.5 px-4 lg:px-5 border-b border-surface-800">
-          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-500 to-accent-700 flex items-center justify-center shrink-0">
-            <Server className="w-4 h-4 text-white" />
+      <aside className="w-16 lg:w-56 border-r border-surface-800/50 bg-surface-900/60 backdrop-blur-xl flex flex-col shrink-0">
+        <div className="h-14 flex items-center gap-2.5 px-4 lg:px-5 border-b border-surface-800/40">
+          <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-accent-500 to-accent-600 flex items-center justify-center shrink-0 shadow-lg shadow-accent-500/20">
+            <svg className="w-4 h-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+              <line x1="8" y1="21" x2="16" y2="21" />
+              <line x1="12" y1="17" x2="12" y2="21" />
+            </svg>
           </div>
           <span className="hidden lg:block text-sm font-semibold text-surface-200 tracking-tight">
             ServerDash
           </span>
         </div>
 
-        <nav className="flex-1 py-3 px-2 lg:px-3 space-y-1 overflow-y-auto">
+        <nav className="flex-1 py-3 px-2 lg:px-3 space-y-0.5 overflow-y-auto">
           {links.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
               className={({ isActive }) =>
-                `flex items-center gap-3 px-2 lg:px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 ${
+                `flex items-center gap-3 px-2 lg:px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
                   isActive
-                    ? 'bg-accent-500/10 text-accent-400 shadow-sm'
-                    : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800'
+                    ? 'bg-accent-500/10 text-accent-400 shadow-sm glow-accent-sm'
+                    : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800/40'
                 }`
               }
             >
@@ -96,19 +97,17 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="p-3 border-t border-surface-800 space-y-2">
+        <div className="p-3 border-t border-surface-800/40 space-y-1.5">
           <button
             onClick={() => setConfirm({ handler: doPruneImages, message: 'Remove unused Docker images?' })}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all
-              bg-surface-800/50 text-surface-400 hover:text-surface-200 hover:bg-surface-800"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all bg-surface-800/30 text-surface-400 hover:text-surface-200 hover:bg-surface-700/40"
           >
             <Eraser className="w-3.5 h-3.5" />
             <span className="hidden lg:block">Prune Images</span>
           </button>
           <button
             onClick={() => setConfirm({ handler: doSystemPrune, message: 'Remove unused containers, images, networks, and build cache?' })}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all
-              bg-surface-800/50 text-surface-400 hover:text-surface-200 hover:bg-surface-800"
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all bg-surface-800/30 text-surface-400 hover:text-surface-200 hover:bg-surface-700/40"
           >
             <Eraser className="w-3.5 h-3.5" />
             <span className="hidden lg:block">System Prune</span>
@@ -119,12 +118,8 @@ export default function Sidebar() {
       <Modal open={!!confirm} title="Confirm" onClose={() => setConfirm(null)}>
         <p className="text-sm text-surface-400 mb-5">{confirm?.message}</p>
         <div className="flex justify-end gap-3">
-          <button onClick={() => setConfirm(null)} className="px-4 py-2 rounded-lg text-sm font-medium text-surface-400 hover:text-surface-200 hover:bg-surface-800 transition-colors">
-            Cancel
-          </button>
-          <button onClick={confirm?.handler} className="px-4 py-2 rounded-lg text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-colors">
-            Prune
-          </button>
+          <button onClick={() => setConfirm(null)} className="btn-secondary">Cancel</button>
+          <button onClick={confirm?.handler} className="px-4 py-2 rounded-xl text-sm font-medium bg-red-600 hover:bg-red-500 text-white transition-all shadow-lg shadow-red-500/20">Prune</button>
         </div>
       </Modal>
 
@@ -135,9 +130,7 @@ export default function Sidebar() {
           ))}
         </div>
         <div className="flex justify-end mt-5">
-          <button onClick={() => setResult(null)} className="px-4 py-2 rounded-lg text-sm font-medium bg-accent-600 hover:bg-accent-500 text-white transition-colors">
-            OK
-          </button>
+          <button onClick={() => setResult(null)} className="btn-primary">OK</button>
         </div>
       </Modal>
     </>
