@@ -455,29 +455,18 @@ func handleDockerEvents(c *fiber.Ctx) error {
 		return err
 	}
 
-	conn, err := net.Dial("unix", "/var/run/docker.sock")
+	resp, err := httpDocker.Get("http://localhost/events")
 	if err != nil {
 		sse.Error(err.Error())
 		return nil
 	}
-	defer conn.Close()
+	defer resp.Body.Close()
 
-	req := "GET /events?since=0 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n"
-	conn.Write([]byte(req))
-
-	br := bufio.NewReader(conn)
+	dec := json.NewDecoder(resp.Body)
 	for {
-		line, err := br.ReadString('\n')
-		if err != nil {
-			break
-		}
-		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
 		var evt map[string]interface{}
-		if err := json.Unmarshal([]byte(line), &evt); err != nil {
-			continue
+		if err := dec.Decode(&evt); err != nil {
+			break
 		}
 		if err := sse.Event("", evt); err != nil {
 			break
