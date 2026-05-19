@@ -31,8 +31,6 @@ func main() {
 		log.Fatalf("Docker client: %v", err)
 	}
 
-	initMetrics()
-
 	// ── System ──
 	sys := app.Group("/api/system")
 	sys.Get("/info", handleSystemInfo)

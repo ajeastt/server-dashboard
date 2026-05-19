@@ -83,6 +83,7 @@ type ContainerResp struct {
 	ID             string       `json:"id"`
 	Name           string       `json:"name"`
 	Image          string       `json:"image"`
+	ImageID        string       `json:"imageId"`
 	State          string       `json:"state"`
 	Status         string       `json:"status"`
 	Ports          []PortResp   `json:"ports"`
@@ -234,6 +235,7 @@ func listContainers() ([]ContainerResp, error) {
 			ID:             c.ID[:12],
 			Name:           name,
 			Image:          c.Image,
+			ImageID:        c.ImageID,
 			State:          c.State,
 			Status:         c.Status,
 			Ports:          c.Ports,
@@ -375,7 +377,7 @@ func listImages() ([]ImageResp, error) {
 	ctrs, _ := listContainers()
 	usedBy := make(map[string][]string)
 	for _, c := range ctrs {
-		usedBy[c.Image] = append(usedBy[c.Image], c.Name)
+		usedBy[c.ImageID] = append(usedBy[c.ImageID], c.Name)
 	}
 
 	res := make([]ImageResp, 0, len(raw))
@@ -420,9 +422,7 @@ func allNoneTags(tags []string) bool {
 }
 
 func pullImage(name string) error {
-	// Use Docker API to create a pull
-	reader, err := dockerGet("/images/create?fromImage=" + name)
-	_ = reader
+	_, err := dockerPost("/images/create?fromImage="+name, nil)
 	return err
 }
 
@@ -554,8 +554,12 @@ func listVolumes() ([]VolumeResp, error) {
 }
 
 func createVolume(name, driver string) (interface{}, error) {
-	body := fmt.Sprintf(`{"Name":"%s","Driver":"%s"}`, name, driver)
-	_, err := dockerPost("/volumes/create", strings.NewReader(body))
+	v := struct {
+		Name   string `json:"Name"`
+		Driver string `json:"Driver"`
+	}{name, driver}
+	b, _ := json.Marshal(v)
+	_, err := dockerPost("/volumes/create", strings.NewReader(string(b)))
 	if err != nil {
 		return nil, err
 	}

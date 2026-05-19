@@ -74,7 +74,12 @@ func handleContainerLogs(c *fiber.Ctx) error {
 }
 
 func handleContainerAction(c *fiber.Ctx) error {
-	if err := containerAction(c.Params("id"), c.Params("action")); err != nil {
+	action := c.Params("action")
+	allowed := map[string]bool{"start": true, "stop": true, "restart": true, "pause": true, "unpause": true, "kill": true}
+	if !allowed[action] {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid action: " + action})
+	}
+	if err := containerAction(c.Params("id"), action); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 	return c.JSON(fiber.Map{"success": true})
@@ -228,7 +233,7 @@ func handleValidateCompose(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"valid": false, "error": err.Error()})
 	}
 
-	cmd := exec.Command("docker", "compose", "-f", tmpPath, "config", "--quiet")
+	cmd := exec.Command("docker", "compose", "-f", tmpPath, "config")
 	if output, err := cmd.CombinedOutput(); err != nil {
 		msg := string(output)
 		if msg == "" {

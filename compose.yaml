@@ -8,8 +8,6 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /opt/stacks:/opt/stacks:rw
-      - /opt/dockge:/opt/dockge:ro
-      - /opt/server-dashboard:/opt/server-dashboard:ro
       - type: bind
         source: /
         target: /host

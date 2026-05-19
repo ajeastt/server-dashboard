@@ -364,7 +364,3 @@ func collectMetrics() (*MetricsData, error) {
 		Timestamp:  now.UnixMilli(),
 	}, nil
 }
-
-func initMetrics() {
-	// No-op, just ensures the package init runs
-}
