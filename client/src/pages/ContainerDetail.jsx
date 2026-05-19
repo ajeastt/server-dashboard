@@ -9,15 +9,17 @@ import ContainerTerminal from '../components/Terminal'
 function LogLine({ num, line, search }) {
   const text = line.t
   const isStderr = line.s === 2
-  const isError = isStderr || /[Ee]rror|[Ff]atal|[Tt]raceback|[Ee]xception/i.test(text)
+  const isEventStart = line.s === 3
+  const isEventStop = line.s === 4
+  const isError = isStderr || isEventStop || /[Ee]rror|[Ff]atal|[Tt]raceback|[Ee]xception/i.test(text)
   const isWarn = /[Ww]arn(ing)?/i.test(text)
   const isDivider = line.s === 0
-  const color = isDivider ? 'text-[#5a5a6a] italic' : isError ? 'text-red-400' : isWarn ? 'text-amber-400' : 'text-[#8a8a9a]'
+  const color = isDivider ? 'text-[#5a5a6a] italic' : isEventStart ? 'text-emerald-400' : isError ? 'text-red-400' : isWarn ? 'text-amber-400' : 'text-[#8a8a9a]'
 
-  if (isDivider) {
+  if (isDivider || isEventStart || isEventStop) {
     return (
-      <div className="flex justify-center py-0.5 select-none">
-        <span className="text-[10px] text-[#5a5a6a] uppercase tracking-widest">{text}</span>
+      <div className={`flex items-center gap-2 py-0.5 select-none ${isEventStart ? 'border-t border-emerald-500/20 pt-2 mt-1' : ''} ${isEventStop ? 'border-t border-red-500/20 pt-2 mt-1' : ''}`}>
+        <span className={`text-[11px] font-semibold ${color}`}>{text}</span>
       </div>
     )
   }
@@ -125,12 +127,40 @@ export default function ContainerDetail() {
       })
     })
 
+    ws.on('log-event', (msg) => {
+      const ev = msg.event
+      if (!ev || ev.Type !== 'container') return
+      const action = ev.Action
+      const name = ev.Actor?.Attributes?.name || ''
+      let label = ''
+      let s = 0
+      if (action === 'start' || action === 'unpause') {
+        label = `▶ ${name} started`
+        s = 3
+      } else if (action === 'die' || action === 'kill' || action === 'oom') {
+        label = `✕ ${name} ${action === 'oom' ? 'OOM killed' : 'died'}`
+        s = 4
+      } else if (action === 'stop') {
+        label = `■ ${name} stopped`
+        s = 4
+      } else if (action === 'restart') {
+        label = `↻ ${name} restarting`
+        s = 3
+      } else if (action === 'health_status') {
+        const status = ev.Actor?.Attributes?.health || 'unknown'
+        label = `♥ ${name} health: ${status}`
+        s = status === 'healthy' ? 3 : 4
+      }
+      if (label) {
+        setLines((prev) => [...prev, { t: label, s }])
+      }
+    })
+
     ws.on('log-error', (msg) => {
-      setLines((prev) => [...prev, { t: msg.error, s: 0 }])
+      setLines((prev) => [...prev, { t: `[ERROR] ${msg.error}`, s: 0 }])
     })
 
     ws.on('log-end', () => {
-      setLines((prev) => [...prev, { t: '── container restarted ──', s: 0 }])
       reconnectTimer = setTimeout(() => ws.send({ type: 'logs', container: id }), 2000)
     })
 

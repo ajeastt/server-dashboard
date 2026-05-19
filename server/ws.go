@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"net/url"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/gofiber/contrib/websocket"
 )
@@ -186,6 +188,64 @@ func handleWebSocket(c *websocket.Conn) {
 			cancel := make(chan struct{})
 			logCancel = func() { close(cancel) }
 
+			// Subscribe to Docker events for this container
+			go func() {
+				filters := url.Values{}
+				filters.Set("filters", fmt.Sprintf(`{"container":{"%s":true}}`, containerID))
+				for {
+					select {
+					case <-cancel:
+						return
+					default:
+					}
+
+					conn, err := net.Dial("unix", "/var/run/docker.sock")
+					if err != nil {
+						time.Sleep(2 * time.Second)
+						continue
+					}
+
+					req := fmt.Sprintf("GET /events?%s HTTP/1.1\r\nHost: localhost\r\n\r\n", filters.Encode())
+					conn.Write([]byte(req))
+
+					br := bufio.NewReader(conn)
+					for {
+						line, err := br.ReadString('\n')
+						if err != nil {
+							conn.Close()
+							break
+						}
+						if strings.TrimSpace(line) == "" {
+							break
+						}
+					}
+
+					scanner := bufio.NewScanner(br)
+					for scanner.Scan() {
+						line := scanner.Text()
+						if line == "" {
+							continue
+						}
+						var ev map[string]interface{}
+						if json.Unmarshal([]byte(line), &ev) != nil {
+							continue
+						}
+						select {
+						case <-cancel:
+							conn.Close()
+							return
+						default:
+						}
+						send(map[string]interface{}{
+							"type":  "log-event",
+							"event": ev,
+						})
+					}
+					conn.Close()
+				}
+			}()
+
+			// Stream container logs
 			go func() {
 				for {
 					select {
@@ -200,11 +260,13 @@ func handleWebSocket(c *websocket.Conn) {
 						return
 					}
 
-					req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=100000 HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n",
+					// NO Connection: close — Docker keeps conn open for follow=true
+					req := fmt.Sprintf("GET /containers/%s/logs?stdout=true&stderr=true&follow=true&tail=100000 HTTP/1.1\r\nHost: localhost\r\n\r\n",
 						containerID)
 					conn.Write([]byte(req))
 
 					br := bufio.NewReader(conn)
+					// Skip HTTP headers
 					headersOK := true
 					for {
 						line, err := br.ReadString('\n')
@@ -245,8 +307,15 @@ func handleWebSocket(c *websocket.Conn) {
 						}
 						if err != nil {
 							conn.Close()
-							send(WSMessage{Type: "log-end"})
-							return
+							// Check if container still exists before reconnecting
+							_, inspectErr := dockerGet("/containers/" + containerID + "/json")
+							if inspectErr != nil {
+								send(WSMessage{Type: "log-end"})
+								return
+							}
+							// Container still exists — reconnect after brief delay
+							time.Sleep(500 * time.Millisecond)
+							break // go to outer for loop to reconnect
 						}
 					}
 				}
