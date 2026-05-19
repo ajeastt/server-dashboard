@@ -15,6 +15,7 @@ async function fetchJson(url, opts = {}) {
 export const api = {
   system: {
     info: () => fetchJson('/system/info'),
+    disks: () => fetchJson('/system/disks'),
   },
   docker: {
     containers: () => fetchJson('/docker/containers'),
@@ -44,6 +45,7 @@ export const api = {
     pruneImages: () => fetchJson('/docker/images/prune', { method: 'POST' }),
 
     volumes: () => fetchJson('/docker/volumes'),
+    createVolume: (name, driver = 'local') => fetchJson('/docker/volumes', { method: 'POST', body: JSON.stringify({ name, driver }) }),
     removeVolume: (name) => fetchJson(`/docker/volumes/${name}`, { method: 'DELETE' }),
     pruneVolumes: () => fetchJson('/docker/volumes/prune', { method: 'POST' }),
 

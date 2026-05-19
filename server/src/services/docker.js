@@ -241,6 +241,11 @@ export async function listVolumes() {
   }));
 }
 
+export async function createVolume(name, driver = 'local') {
+  await docker.createVolume({ name, driver });
+  return { success: true, name };
+}
+
 export async function removeVolume(name) {
   const volume = docker.getVolume(name);
   await volume.remove({ force: true });

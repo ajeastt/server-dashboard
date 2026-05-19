@@ -3,7 +3,7 @@ import {
   listContainers, getContainer, getContainerStats, getContainerLogs, executeAction,
   listStacks, deployStack, restartStack, destroyStack, getStackCompose, updateStackCompose, updateStackImages, updateStackImagesStream, validateCompose,
   listImages, pullImage, pullImageStream, checkImageUpdate, removeImage, pruneImages,
-  listVolumes, removeVolume, pruneVolumes,
+  listVolumes, createVolume, removeVolume, pruneVolumes,
   listNetworks, removeNetwork, pruneNetworks,
   systemPrune,
 } from '../services/docker.js';
@@ -88,6 +88,11 @@ dockerRouter.post('/images/prune', async (req, res) => {
 
 dockerRouter.get('/volumes', async (req, res) => {
   try { res.json(await listVolumes()); }
+  catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+dockerRouter.post('/volumes', async (req, res) => {
+  try { res.json(await createVolume(req.body.name, req.body.driver)); }
   catch (err) { res.status(500).json({ error: err.message }); }
 });
 
