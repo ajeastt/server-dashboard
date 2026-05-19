@@ -154,8 +154,17 @@ export default function Containers() {
   }
 
   const formatPorts = (ports) => {
-    if (!ports || ports.length === 0) return <span className="text-[#5a5a6a]">—</span>
-    return ports.map((p) => `${p.PublicPort > 0 ? p.PublicPort : '-'}:${p.PrivatePort}/${p.Type}`).join(', ')
+    if (!ports || ports.length === 0) return null
+    return ports.map((p, i) => (
+      <span key={i} className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-base-800/60 border border-base-700/40 text-[#8a8a9a] whitespace-nowrap">
+        {p.PublicPort > 0 ? p.PublicPort : '-'}:{p.PrivatePort}/{p.Type}
+      </span>
+    ))
+  }
+
+  const uptime = (status) => {
+    if (!status || !status.startsWith('Up')) return null
+    return <span className="text-[10px] text-emerald-400/60 font-mono">⬤ {status}</span>
   }
 
   const statusDot = (state) => {
@@ -214,14 +223,17 @@ export default function Containers() {
                   </div>
                 </button>
                 {expanded && ctrs.length > 0 && ctrs.map((c) => (
-                  <div key={c.id} className="flex items-center gap-3 px-4 py-2 border-t border-base-700/30 hover:bg-white/[0.02] transition-all">
+                  <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/30 hover:bg-white/[0.02] transition-all ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
                     {statusDot(c.state)}
                     <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-[#e4e4ed] hover:text-accent-400 transition-colors truncate">{c.name}</div>
-                      <div className="text-xs text-[#5a5a6a] truncate">{c.image}</div>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-[#5a5a6a] truncate">{c.image}</span>
+                        {uptime(c.status)}
+                      </div>
                     </Link>
-                    <span className="text-xs text-[#5a5a6a] font-mono hidden md:block">{formatPorts(c.ports)}</span>
-                    <span className="text-xs text-[#5a5a6a] whitespace-nowrap">{c.status}</span>
+                    <div className="flex items-center gap-1 hidden lg:flex">{formatPorts(c.ports)}</div>
+                    <span className="text-xs text-[#5a5a6a] whitespace-nowrap">{c.state === 'running' ? c.status : ''}</span>
                     <div className="flex items-center gap-0.5">
                       {c.state === 'running' ? (
                         <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1 rounded text-[#5a5a6a] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
@@ -249,14 +261,17 @@ export default function Containers() {
                 <span className="text-xs text-[#5a5a6a]">{standalone.length}</span>
               </div>
               {standalone.map((c) => (
-                <div key={c.id} className="flex items-center gap-3 px-4 py-2 border-t border-base-700/20 hover:bg-white/[0.02] transition-all">
+                <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/20 hover:bg-white/[0.02] transition-all ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
                   {statusDot(c.state)}
                   <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-[#e4e4ed] hover:text-accent-400 transition-colors truncate">{c.name}</div>
-                    <div className="text-xs text-[#5a5a6a] truncate">{c.image}</div>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-xs text-[#5a5a6a] truncate">{c.image}</span>
+                      {uptime(c.status)}
+                    </div>
                   </Link>
-                  <span className="text-xs text-[#5a5a6a] font-mono hidden md:block">{formatPorts(c.ports)}</span>
-                  <span className="text-xs text-[#5a5a6a] whitespace-nowrap">{c.status}</span>
+                  <div className="flex items-center gap-1 hidden lg:flex">{formatPorts(c.ports)}</div>
+                  <span className="text-xs text-[#5a5a6a] whitespace-nowrap">{c.state === 'running' ? c.status : ''}</span>
                   <div className="flex items-center gap-0.5">
                     {c.state === 'running' ? (
                       <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1 rounded text-[#5a5a6a] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">

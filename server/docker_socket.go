@@ -352,6 +352,7 @@ func stripDockerHeaders(data []byte) string {
 // dockerLogReader buffers raw log data and extracts complete Docker log frames.
 // Docker log framing: 8-byte header (stream type[1] + padding[3] + big-endian length[4]) + payload.
 // TCP reads may split frames arbitrarily; this reader handles that correctly.
+// Output includes stream marker bytes: \x01 for stdout, \x02 for stderr, before each frame's text.
 type dockerLogReader struct {
 	buf []byte
 }
@@ -360,7 +361,8 @@ func newDockerLogReader() *dockerLogReader {
 	return &dockerLogReader{}
 }
 
-// Write feeds raw bytes into the reader. It returns any complete frames' payload as text.
+// Write feeds raw bytes into the reader. It returns any complete frames' payload as text,
+// with each frame prefixed by its stream type byte (1=stdout, 2=stderr).
 func (r *dockerLogReader) Write(data []byte) string {
 	r.buf = append(r.buf, data...)
 	var out strings.Builder
@@ -368,15 +370,45 @@ func (r *dockerLogReader) Write(data []byte) string {
 		if len(r.buf) < 8 {
 			break
 		}
+		streamType := r.buf[0]
 		payloadLen := (int(r.buf[4]) << 24) | (int(r.buf[5]) << 16) | (int(r.buf[6]) << 8) | int(r.buf[7])
 		frameEnd := 8 + payloadLen
 		if len(r.buf) < frameEnd {
 			break
 		}
+		out.WriteByte(streamType)
 		out.Write(r.buf[8:frameEnd])
 		r.buf = r.buf[frameEnd:]
 	}
 	return out.String()
+}
+
+// getDockerEvents fetches recent Docker events (last hour).
+func getDockerEvents() ([]map[string]interface{}, error) {
+	now := time.Now()
+	since := now.Unix() - 3600
+	until := now.Unix()
+	path := fmt.Sprintf("/events?since=%d&until=%d", since, until)
+	body, err := dockerGet(path)
+	if err != nil {
+		return nil, err
+	}
+	var events []map[string]interface{}
+	for _, line := range strings.Split(strings.TrimSpace(string(body)), "\n") {
+		if line == "" {
+			continue
+		}
+		var event map[string]interface{}
+		if err := json.Unmarshal([]byte(line), &event); err != nil {
+			continue
+		}
+		events = append(events, event)
+	}
+	// Keep only the most recent 100 events
+	if len(events) > 100 {
+		events = events[len(events)-100:]
+	}
+	return events, nil
 }
 
 func containerAction(id, action string) error {

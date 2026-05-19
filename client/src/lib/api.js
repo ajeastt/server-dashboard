@@ -53,6 +53,7 @@ export const api = {
     removeNetwork: (id) => fetchJson(`/docker/networks/${id}`, { method: 'DELETE' }),
     pruneNetworks: () => fetchJson('/docker/networks/prune', { method: 'POST' }),
 
+    events: () => fetchJson('/docker/events'),
     prune: () => fetchJson('/docker/prune', { method: 'POST' }),
   },
   files: {

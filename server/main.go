@@ -61,6 +61,7 @@ func main() {
 	d.Delete("/networks/:id", handleRemoveNetwork)
 	d.Post("/networks/prune", handlePruneNetworks)
 	d.Post("/prune", handleSystemPrune)
+	d.Get("/events", handleDockerEvents)
 	d.Post("/stacks/validate", handleValidateCompose)
 	d.Get("/stacks", handleListStacks)
 	d.Post("/stacks", handleDeployStack)

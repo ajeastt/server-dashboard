@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Cpu, HardDrive, Activity, Container, Network, Server, ArrowDown, ArrowUp } from 'lucide-react'
+import { Cpu, HardDrive, Activity, Container, Network, Server, ArrowDown, ArrowUp, Box, Play, Square, AlertTriangle } from 'lucide-react'
 import { useMetrics } from '../hooks/useMetrics'
 import { api } from '../lib/api'
 import { formatBytes, formatUptime } from '../lib/utils'
@@ -7,12 +7,27 @@ import StatCard from '../components/StatCard'
 import ResourceBar from '../components/ResourceBar'
 import MiniChart from '../components/MiniChart'
 
+const eventIcons = {
+  start: Play,
+  stop: Square,
+  die: AlertTriangle,
+  destroy: null,
+}
+
 export default function Dashboard() {
   const { metrics, history } = useMetrics()
   const [sysInfo, setSysInfo] = useState(null)
+  const [events, setEvents] = useState([])
 
   useEffect(() => {
     api.system.info().then(setSysInfo).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const fetch = () => api.docker.events().then(setEvents).catch(() => {})
+    fetch()
+    const interval = setInterval(fetch, 8000)
+    return () => clearInterval(interval)
   }, [])
 
   if (!metrics) {
@@ -152,6 +167,33 @@ export default function Dashboard() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Docker Events */}
+      {events.length > 0 && (
+        <div className="card p-4">
+          <div className="flex items-center gap-2 mb-3">
+            <Box className="w-4 h-4 text-accent-400" />
+            <h2 className="text-sm font-semibold text-[#e4e4ed]">Recent Events</h2>
+            <span className="text-xs text-[#5a5a6a]">last hour</span>
+          </div>
+          <div className="space-y-0.5 max-h-64 overflow-y-auto">
+            {events.slice(-40).reverse().map((ev, i) => {
+              if (ev.Type !== 'container') return null
+              const isDie = ev.Action === 'die' || ev.Action === 'kill' || ev.Action === 'oom'
+              const iconColor = ev.Action === 'start' ? 'text-emerald-400' : isDie ? 'text-red-400' : 'text-accent-400'
+              const name = ev.Actor?.Attributes?.name || ev.Actor?.ID?.slice(0, 12)
+              const ts = ev.time ? new Date(ev.time * 1000).toLocaleTimeString() : ''
+              return (
+                <div key={i} className="flex items-center gap-2 py-1 px-2 -mx-2 rounded hover:bg-white/[0.02] transition-all">
+                  <span className="text-[10px] text-[#5a5a6a] font-mono w-16 shrink-0 text-right">{ts}</span>
+                  <span className={`text-xs ${iconColor}`}>{ev.Action}</span>
+                  <span className="text-xs text-[#e4e4ed] font-mono truncate flex-1">{name}</span>
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

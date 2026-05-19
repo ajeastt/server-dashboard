@@ -134,6 +134,16 @@ func handlePruneImages(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+// ── Event handlers ──
+
+func handleDockerEvents(c *fiber.Ctx) error {
+	events, err := getDockerEvents()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(events)
+}
+
 // ── Volume handlers ──
 
 func handleListVolumes(c *fiber.Ctx) error {
