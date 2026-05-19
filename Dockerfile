@@ -1,22 +1,22 @@
-FROM node:20-alpine AS builder
+FROM node:20-alpine AS frontend-builder
 WORKDIR /app
+COPY client/package.json client/package-lock.json ./
+RUN npm ci
+COPY client/ .
+RUN npm run build
 
-COPY package.json ./
-COPY client/package.json client/
-COPY server/package.json server/
-RUN npm install
-RUN cd client && npm install
-RUN cd server && npm install
+FROM golang:1.26-alpine AS go-builder
+RUN apk add --no-cache gcc musl-dev
+WORKDIR /app
+COPY server/go.mod server/go.sum ./
+RUN go mod download
+COPY server/ .
+RUN CGO_ENABLED=0 go build -o server-dashboard .
 
-COPY . .
-RUN cd client && npm run build
-
-FROM node:20-alpine AS runner
+FROM alpine:3.21
 RUN apk add --no-cache docker-cli docker-compose
 WORKDIR /app
-COPY --from=builder /app/server /app/server
-COPY --from=builder /app/client/dist /app/client/dist
-COPY --from=builder /app/server/node_modules /app/server/node_modules
-
+COPY --from=go-builder /app/server-dashboard .
+COPY --from=frontend-builder /app/dist ./client/dist
 EXPOSE 3001
-CMD ["node", "server/src/index.js"]
+CMD ["./server-dashboard"]
