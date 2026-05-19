@@ -103,10 +103,10 @@ if [[ "$PORT" != "3001" ]]; then
   fi
 fi
 
-# ── Build and start ──
-echo -e "  ${BLUE}→${NC} Building and starting Server Dashboard..."
+# ── Pull and start ──
+echo -e "  ${BLUE}→${NC} Starting Server Dashboard..."
 export SERVERDASH_PORT="$PORT"
-sudo -E docker compose up -d --build
+sudo -E docker compose pull && sudo -E docker compose up -d
 
 # ── Done ──
 echo ""
@@ -116,6 +116,6 @@ echo -e "  Access it at: ${BOLD}http://localhost:$PORT${NC}"
 echo ""
 echo -e "  ${BLUE}Commands:${NC}"
 echo -e "    View logs:  sudo docker compose -f $INSTALL_DIR/compose.yaml logs -f"
-echo -e "    Update:     cd $INSTALL_DIR && sudo git pull && sudo docker compose up -d --build"
+echo -e "    Update:     cd $INSTALL_DIR && sudo git pull && sudo docker compose pull && sudo docker compose up -d"
 echo -e "    Stop:       sudo docker compose -f $INSTALL_DIR/compose.yaml down"
 echo ""

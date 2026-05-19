@@ -1,6 +1,7 @@
 services:
   server-dashboard:
-    build: .
+    image: ghcr.io/ajeastt/server-dashboard:latest
+    pull_policy: always
     container_name: server-dashboard
     ports:
       - "${SERVERDASH_PORT:-3001}:3001"
