@@ -6,7 +6,6 @@ import ContainerDetail from './pages/ContainerDetail.jsx'
 import Volumes from './pages/Volumes.jsx'
 import Networks from './pages/Networks.jsx'
 import Files from './pages/Files.jsx'
-import Settings from './pages/Settings.jsx'
 
 export default function App() {
   return (
@@ -18,7 +17,6 @@ export default function App() {
         <Route path="/volumes" element={<Volumes />} />
         <Route path="/networks" element={<Networks />} />
         <Route path="/files" element={<Files />} />
-        <Route path="/settings" element={<Settings />} />
         <Route path="/stacks" element={<Navigate to="/containers" replace />} />
       </Route>
     </Routes>

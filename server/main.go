@@ -78,15 +78,6 @@ func main() {
 	f.Get("/list", handleFileList)
 	f.Get("/read", handleFileRead)
 
-	// ── Widget Config ──
-	app.Get("/api/config", handleGetConfig)
-	app.Put("/api/config", handleSaveConfig)
-	app.Delete("/api/config/unifi", handleDeleteUniFiConfig)
-
-	// ── Widget Data ──
-	app.Get("/api/widgets/unifi/clients", handleUniFiClients)
-	app.Get("/api/widgets/unifi/health", handleUniFiHealth)
-
 	// ── WebSocket ──
 	app.Get("/ws", websocket.New(handleWebSocket))
 

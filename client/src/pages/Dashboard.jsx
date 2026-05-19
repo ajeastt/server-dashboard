@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react'
-import { Cpu, HardDrive, Activity, Container, Network, Server, Wifi, User } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { Cpu, HardDrive, Activity, Container, Network, Server } from 'lucide-react'
 import { useMetrics } from '../hooks/useMetrics'
 import { api } from '../lib/api'
 import { formatBytes, formatUptime } from '../lib/utils'
@@ -10,39 +10,9 @@ import MiniChart from '../components/MiniChart'
 export default function Dashboard() {
   const { metrics, history } = useMetrics()
   const [sysInfo, setSysInfo] = useState(null)
-  const [unifiHealth, setUnifiHealth] = useState(null)
-  const [unifiConfigured, setUnifiConfigured] = useState(false)
-  const [unifiError, setUnifiError] = useState(null)
-  const unifiConfiguredRef = useRef(false)
 
   useEffect(() => {
-    unifiConfiguredRef.current = unifiConfigured
-  }, [unifiConfigured])
-
-  const fetchUnifi = () => {
-    api.widgets.unifi.health()
-      .then((data) => { setUnifiHealth(data); setUnifiError(null) })
-      .catch((err) => {
-        console.error('UniFi health:', err)
-        setUnifiError(err.message)
-      })
-  }
-
-  useEffect(() => {
-    api.config.get().then((cfg) => {
-      if (cfg.widgets?.unifi?.configured) {
-        setUnifiConfigured(true)
-        fetchUnifi()
-      }
-    }).catch(() => {})
-
-    const interval = setInterval(() => {
-      if (unifiConfiguredRef.current) {
-        api.widgets.unifi.health().then(setUnifiHealth).catch(() => {})
-      }
-    }, 20000)
-
-    return () => clearInterval(interval)
+    api.system.info().then(setSysInfo).catch(() => {})
   }, [])
 
   if (!metrics) {
@@ -148,50 +118,6 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
-
-      {unifiConfigured && (
-        <div className="rounded-xl border border-surface-800 bg-surface-900 p-5">
-          <div className="flex items-center gap-2 mb-4">
-            <Wifi className="w-4 h-4 text-accent-400" />
-            <h2 className="text-sm font-semibold text-surface-200">UniFi Network</h2>
-          </div>
-          {unifiHealth ? (
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-              <div className="flex flex-col gap-1 p-3 rounded-lg bg-surface-800/50">
-                <span className="text-xs text-surface-500">Clients</span>
-                <span className="text-lg font-bold text-surface-100">{unifiHealth.num_clients}</span>
-                <span className="text-xs text-surface-500">
-                  {unifiHealth.num_wifi} wifi · {unifiHealth.num_wired} wired
-                </span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 rounded-lg bg-surface-800/50">
-                <span className="text-xs text-surface-500">Internet</span>
-                <span className={`text-lg font-bold ${unifiHealth.internet === 'online' ? 'text-emerald-400' : 'text-red-400'}`}>
-                  {unifiHealth.internet || 'N/A'}
-                </span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 rounded-lg bg-surface-800/50">
-                <span className="text-xs text-surface-500">WAN IP</span>
-                <span className="text-sm font-bold text-surface-100 truncate">{unifiHealth.wan_ip || 'N/A'}</span>
-              </div>
-              <div className="flex flex-col gap-1 p-3 rounded-lg bg-surface-800/50">
-                <span className="text-xs text-surface-500">Controller</span>
-                <span className="text-lg font-bold text-surface-100">{formatUptime(unifiHealth.uptime)}</span>
-              </div>
-            </div>
-          ) : unifiError ? (
-            <div className="flex items-center gap-2 text-sm text-amber-400">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
-              {unifiError}
-            </div>
-          ) : (
-            <div className="flex items-center gap-2 text-sm text-surface-500">
-              <span className="w-1.5 h-1.5 rounded-full bg-surface-500 animate-pulse" />
-              Connecting to UniFi controller...
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
