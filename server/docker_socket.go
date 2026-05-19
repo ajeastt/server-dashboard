@@ -505,9 +505,15 @@ func pruneImages() (interface{}, error) {
 	if err != nil {
 		return nil, err
 	}
-	var r interface{}
+	var r struct {
+		ImagesDeleted  []interface{} `json:"ImagesDeleted"`
+		SpaceReclaimed uint64        `json:"SpaceReclaimed"`
+	}
 	json.Unmarshal(b, &r)
-	return r, nil
+	return map[string]interface{}{
+		"images_deleted":  len(r.ImagesDeleted),
+		"space_reclaimed": r.SpaceReclaimed,
+	}, nil
 }
 
 // ── Volume operations ──
