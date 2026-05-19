@@ -59,6 +59,17 @@ export const api = {
     list: (path = '/') => fetchJson(`/files/list?path=${encodeURIComponent(path)}`),
     read: (path) => fetchJson(`/files/read?path=${encodeURIComponent(path)}`),
   },
+  config: {
+    get: () => fetchJson('/config'),
+    save: (widgets) => fetchJson('/config', { method: 'PUT', body: JSON.stringify({ widgets }) }),
+    deleteUniFi: () => fetchJson('/config/unifi', { method: 'DELETE' }),
+  },
+  widgets: {
+    unifi: {
+      clients: () => fetchJson('/widgets/unifi/clients'),
+      health: () => fetchJson('/widgets/unifi/health'),
+    },
+  },
 };
 
 // ── WebSocket connection with message dispatch ──

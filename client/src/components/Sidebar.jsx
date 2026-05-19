@@ -10,6 +10,7 @@ import {
   Check,
   Loader,
   FolderTree,
+  Settings,
 } from 'lucide-react'
 import { api } from '../lib/api'
 
@@ -19,6 +20,7 @@ const links = [
   { to: '/volumes', label: 'Volumes', icon: HardDrive },
   { to: '/networks', label: 'Networks', icon: Share2 },
   { to: '/files', label: 'Files', icon: FolderTree },
+  { to: '/settings', label: 'Settings', icon: Settings },
 ]
 
 export default function Sidebar() {
