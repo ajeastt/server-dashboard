@@ -12,10 +12,11 @@ import (
 )
 
 type unifiClient struct {
-	baseURL  string
-	username string
-	password string
-	client   *http.Client
+	baseURL    string
+	username   string
+	password   string
+	client     *http.Client
+	apiPrefix  string
 }
 
 func newUnifiClient(cfg *UniFiConfig) *unifiClient {
@@ -35,22 +36,86 @@ func newUnifiClient(cfg *UniFiConfig) *unifiClient {
 	}
 }
 
-func (u *unifiClient) login() error {
+// tryLogin attempts to log in with the given API prefix path.
+// Returns true on success.
+func (u *unifiClient) tryLogin(prefix string) bool {
 	body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
-	req, err := http.NewRequest("POST", u.baseURL+"/api/login", strings.NewReader(body))
+	req, err := http.NewRequest("POST", u.baseURL+prefix+"/login", strings.NewReader(body))
 	if err != nil {
-		return err
+		return false
 	}
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := u.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("login: %v", err)
+		return false
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != 200 {
-		return fmt.Errorf("login: status %d", resp.StatusCode)
+	return resp.StatusCode == 200
+}
+
+func (u *unifiClient) login() error {
+	if u.apiPrefix != "" {
+		// Already detected, just re-login
+		body := fmt.Sprintf(`{"username":"%s","password":"%s"}`, u.username, u.password)
+		req, _ := http.NewRequest("POST", u.baseURL+u.apiPrefix+"/login", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := u.client.Do(req)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != 200 {
+			return fmt.Errorf("login: status %d", resp.StatusCode)
+		}
+		return nil
 	}
-	return nil
+
+	// Auto-detect API path: try classic first, then UniFi OS proxy path
+	if u.tryLogin("/api") {
+		u.apiPrefix = "/api"
+		return nil
+	}
+	if u.tryLogin("/proxy/network/api") {
+		u.apiPrefix = "/proxy/network/api"
+		return nil
+	}
+	return fmt.Errorf("login failed: could not reach UniFi controller")
+}
+
+func (u *unifiClient) get(path string) ([]byte, error) {
+	if u.apiPrefix == "" {
+		if err := u.login(); err != nil {
+			return nil, err
+		}
+	}
+
+	fullPath := u.apiPrefix + path
+	req, err := http.NewRequest("GET", u.baseURL+fullPath, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	resp, err := u.client.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode == 401 {
+		if err := u.login(); err != nil {
+			return nil, err
+		}
+		req, _ = http.NewRequest("GET", u.baseURL+fullPath, nil)
+		req.Header.Set("Accept", "application/json")
+		resp2, err := u.client.Do(req)
+		if err != nil {
+			return nil, err
+		}
+		defer resp2.Body.Close()
+		return io.ReadAll(resp2.Body)
+	}
+
+	return io.ReadAll(resp.Body)
 }
 
 type UniFiClient struct {
@@ -78,13 +143,6 @@ type UniFiHealth struct {
 	Uptime        int64  `json:"uptime"`
 }
 
-type uniFiResp struct {
-	Meta struct {
-		RC string `json:"rc"`
-	} `json:"meta"`
-	Data []json.RawMessage `json:"data"`
-}
-
 type uniFiHealthResp struct {
 	Meta struct {
 		RC string `json:"rc"`
@@ -100,36 +158,11 @@ type uniFiHealthResp struct {
 		Internet            string `json:"internet"`
 		LANSubnet           string `json:"lan_subnet"`
 		SysUpTime           int64  `json:"sys_uptime"`
-		Wan1Interface       string `json:"wan1_iface"`
 	} `json:"data"`
 }
 
-func (u *unifiClient) get(path string) ([]byte, error) {
-	req, err := http.NewRequest("GET", u.baseURL+path, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Accept", "application/json")
-	resp, err := u.client.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode == 401 {
-		if err := u.login(); err != nil {
-			return nil, err
-		}
-		resp, err = u.client.Do(req)
-		if err != nil {
-			return nil, err
-		}
-		defer resp.Body.Close()
-	}
-	return io.ReadAll(resp.Body)
-}
-
 func (u *unifiClient) getActiveClients() ([]UniFiClient, error) {
-	b, err := u.get("/api/s/default/stat/sta")
+	b, err := u.get("/s/default/stat/sta")
 	if err != nil {
 		return nil, err
 	}
@@ -172,7 +205,7 @@ func (u *unifiClient) getActiveClients() ([]UniFiClient, error) {
 }
 
 func (u *unifiClient) getHealth() (*UniFiHealth, error) {
-	b, err := u.get("/api/s/default/stat/health")
+	b, err := u.get("/s/default/stat/health")
 	if err != nil {
 		return nil, err
 	}

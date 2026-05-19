@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Cpu, HardDrive, Activity, Container, Network, Server, Wifi, User } from 'lucide-react'
 import { useMetrics } from '../hooks/useMetrics'
 import { api } from '../lib/api'
@@ -12,18 +12,37 @@ export default function Dashboard() {
   const [sysInfo, setSysInfo] = useState(null)
   const [unifiHealth, setUnifiHealth] = useState(null)
   const [unifiConfigured, setUnifiConfigured] = useState(false)
+  const [unifiError, setUnifiError] = useState(null)
+  const unifiConfiguredRef = useRef(false)
 
   useEffect(() => {
-    api.system.info().then(setSysInfo).catch(() => {})
-  }, [])
+    unifiConfiguredRef.current = unifiConfigured
+  }, [unifiConfigured])
+
+  const fetchUnifi = () => {
+    api.widgets.unifi.health()
+      .then((data) => { setUnifiHealth(data); setUnifiError(null) })
+      .catch((err) => {
+        console.error('UniFi health:', err)
+        setUnifiError(err.message)
+      })
+  }
 
   useEffect(() => {
     api.config.get().then((cfg) => {
       if (cfg.widgets?.unifi?.configured) {
         setUnifiConfigured(true)
-        api.widgets.unifi.health().then(setUnifiHealth).catch(() => {})
+        fetchUnifi()
       }
     }).catch(() => {})
+
+    const interval = setInterval(() => {
+      if (unifiConfiguredRef.current) {
+        api.widgets.unifi.health().then(setUnifiHealth).catch(() => {})
+      }
+    }, 20000)
+
+    return () => clearInterval(interval)
   }, [])
 
   if (!metrics) {
@@ -160,8 +179,16 @@ export default function Dashboard() {
                 <span className="text-lg font-bold text-surface-100">{formatUptime(unifiHealth.uptime)}</span>
               </div>
             </div>
+          ) : unifiError ? (
+            <div className="flex items-center gap-2 text-sm text-amber-400">
+              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+              {unifiError}
+            </div>
           ) : (
-            <div className="text-sm text-surface-500">Connecting to UniFi controller...</div>
+            <div className="flex items-center gap-2 text-sm text-surface-500">
+              <span className="w-1.5 h-1.5 rounded-full bg-surface-500 animate-pulse" />
+              Connecting to UniFi controller...
+            </div>
           )}
         </div>
       )}
