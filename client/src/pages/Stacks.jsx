@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { Layers, Plus, Trash2, Play, Terminal, X, Edit3, Loader } from 'lucide-react'
 import { api } from '../lib/api'
 import { stateColor, stateBg } from '../lib/utils'
+import YamlEditor from '../components/YamlEditor'
 
 export default function Stacks() {
   const [stacks, setStacks] = useState([])
@@ -199,7 +200,9 @@ export default function Stacks() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-surface-400 mb-1.5">docker-compose.yml</label>
-                <textarea value={composeYaml} onChange={(e) => setComposeYaml(e.target.value)} placeholder={`services:\n  app:\n    image: nginx:latest\n    ports:\n      - "80:80"`} rows={12} className="w-full px-3 py-2 text-sm rounded-lg border border-surface-700 bg-surface-850 text-surface-200 placeholder-surface-500 focus:outline-none focus:border-accent-500/50 focus:ring-1 focus:ring-accent-500/20 transition-all font-mono resize-none" required />
+                <div className="border border-surface-700 rounded-lg overflow-hidden">
+                  <YamlEditor value={composeYaml} onChange={setComposeYaml} placeholder={`services:\n  app:\n    image: nginx:latest\n    ports:\n      - "80:80"`} minHeight="220px" />
+                </div>
               </div>
               {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">{error}</div>}
               <div className="flex justify-end gap-3 pt-2">
