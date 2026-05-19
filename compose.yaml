@@ -9,7 +9,12 @@ services:
       - /opt/stacks:/opt/stacks:ro
       - /opt/dockge:/opt/dockge:ro
       - /opt/server-dashboard:/opt/server-dashboard:ro
-      - /:/host:ro
+      - type: bind
+        source: /
+        target: /host
+        read_only: true
+        bind:
+          propagation: rslave
     restart: unless-stopped
     environment:
       - PORT=3001
