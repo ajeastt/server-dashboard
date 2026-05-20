@@ -14,6 +14,7 @@ services:
         read_only: true
         bind:
           propagation: rslave
+    privileged: true
     restart: unless-stopped
     environment:
       - PORT=3001
