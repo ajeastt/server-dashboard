@@ -664,6 +664,12 @@ type dockerNetwork struct {
 	Created    string `json:"Created"`
 }
 
+var protectedNetworks = map[string]bool{
+	"bridge": true,
+	"host":   true,
+	"none":   true,
+}
+
 func listNetworks() ([]NetworkResp, error) {
 	b, err := dockerGet("/networks")
 	if err != nil {
@@ -675,6 +681,9 @@ func listNetworks() ([]NetworkResp, error) {
 	}
 	res := make([]NetworkResp, 0, len(raw))
 	for _, n := range raw {
+		if protectedNetworks[n.Name] {
+			continue
+		}
 		nc := 0
 		if n.Containers != nil {
 			nc = len(n.Containers)
