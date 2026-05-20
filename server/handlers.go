@@ -334,6 +334,23 @@ func handleFileList(c *fiber.Ctx) error {
 	return c.JSON(result)
 }
 
+func handleFileWrite(c *fiber.Ctx) error {
+	var body struct {
+		Path    string `json:"path"`
+		Content string `json:"content"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if body.Path == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "path is required"})
+	}
+	if err := writeFileContent(body.Path, body.Content); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
 func handleFileRead(c *fiber.Ctx) error {
 	path := c.Query("path")
 	if path == "" {

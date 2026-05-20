@@ -137,6 +137,14 @@ func readFileContent(userPath string) (*FileReadResp, error) {
 	return &FileReadResp{Content: string(content), Binary: false, Encoding: "utf-8"}, nil
 }
 
+func writeFileContent(userPath, content string) error {
+	target, err := safeResolve(userPath)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(target, []byte(content), 0644)
+}
+
 func isBinary(data []byte) bool {
 	// Check first 8KB for null bytes
 	checkLen := len(data)

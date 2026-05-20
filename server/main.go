@@ -76,6 +76,7 @@ func main() {
 	f := app.Group("/api/files")
 	f.Get("/list", handleFileList)
 	f.Get("/read", handleFileRead)
+	f.Put("/write", handleFileWrite)
 
 	// ── WebSocket ──
 	app.Get("/ws", websocket.New(handleWebSocket))

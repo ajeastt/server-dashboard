@@ -59,6 +59,7 @@ export const api = {
   files: {
     list: (path = '/') => fetchJson(`/files/list?path=${encodeURIComponent(path)}`),
     read: (path) => fetchJson(`/files/read?path=${encodeURIComponent(path)}`),
+    write: (path, content) => fetchJson('/files/write', { method: 'PUT', body: JSON.stringify({ path, content }) }),
   },
 };
 

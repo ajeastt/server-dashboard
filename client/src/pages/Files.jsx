@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from 'react'
-import { Folder, FileText, Link as LinkIcon, ChevronRight, X, RefreshCw, ArrowLeft } from 'lucide-react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { Folder, FileText, Link as LinkIcon, ChevronRight, X, RefreshCw, ArrowLeft, Edit3, Save, Check, Loader } from 'lucide-react'
 import { api } from '../lib/api'
 import { formatBytes } from '../lib/utils'
 
@@ -12,6 +12,11 @@ export default function Files() {
   const [previewFile, setPreviewFile] = useState(null)
   const [previewContent, setPreviewContent] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editContent, setEditContent] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveMsg, setSaveMsg] = useState('')
+  const textareaRef = useRef(null)
 
   const navigate = useCallback(async (p) => {
     setLoading(true); setError('')
@@ -22,12 +27,38 @@ export default function Files() {
 
   useEffect(() => { navigate('/') }, [navigate])
 
+  // Ctrl+S to save
+  useEffect(() => {
+    const handler = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 's' && editing) {
+        e.preventDefault(); handleSave()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  })
+
   const handleOpenPreview = async (entry) => {
     if (entry.type !== 'file' && entry.type !== 'symlink') return
+    setEditing(false); setSaveMsg('')
     setPreviewLoading(true); setPreviewFile(entry); setPreviewContent(null)
-    try { setPreviewContent(await api.files.read(entry.path)) }
+    try { const c = await api.files.read(entry.path); setPreviewContent(c); setEditContent(c.content || '') }
     catch (err) { setPreviewContent({ error: err.message }) }
     finally { setPreviewLoading(false) }
+  }
+
+  const handleSave = async () => {
+    if (!previewFile || saving) return
+    setSaving(true); setSaveMsg('')
+    try {
+      await api.files.write(previewFile.path, editContent)
+      setSaveMsg('saved')
+      setTimeout(() => setSaveMsg(''), 2000)
+    } catch (err) {
+      setSaveMsg(`error: ${err.message}`)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const handleDoubleClick = (entry) => entry.type === 'directory' ? navigate(entry.path) : handleOpenPreview(entry)
@@ -95,11 +126,27 @@ export default function Files() {
       </div>
 
       {previewFile && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => { setPreviewFile(null); setPreviewContent(null) }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => { setPreviewFile(null); setPreviewContent(null); setEditing(false); setSaveMsg('') }}>
           <div className="w-full max-w-4xl mx-4 rounded-xl border border-base-700/60 bg-base-900 shadow-xl animate-fade-in overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-base-700/40">
-              <div className="flex items-center gap-2 min-w-0"><FileText className="w-4 h-4 text-[#8a8a9a] shrink-0" /><h2 className="text-sm font-semibold text-[#e4e4ed] truncate">{previewFile.path}</h2></div>
-              <button onClick={() => { setPreviewFile(null); setPreviewContent(null) }} className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><X className="w-4 h-4" /></button>
+              <div className="flex items-center gap-2 min-w-0">
+                <FileText className="w-4 h-4 text-[#8a8a9a] shrink-0" />
+                <h2 className="text-sm font-semibold text-[#e4e4ed] truncate">{previewFile.path}</h2>
+                {saveMsg === 'saved' && <span className="text-xs text-emerald-400"><Check className="w-3 h-3 inline" /> Saved</span>}
+                {saveMsg && saveMsg !== 'saved' && <span className="text-xs text-red-400">{saveMsg}</span>}
+              </div>
+              <div className="flex items-center gap-1">
+                {previewContent?.content !== undefined && !previewContent?.binary && (
+                  editing ? (
+                    <button onClick={handleSave} disabled={saving} className="btn-ghost p-1.5 text-xs" title="Save (Ctrl+S)">
+                      {saving ? <Loader className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                    </button>
+                  ) : (
+                    <button onClick={() => { setEditing(true); setSaveMsg('') }} className="btn-ghost p-1.5 text-xs" title="Edit"><Edit3 className="w-3.5 h-3.5" /></button>
+                  )
+                )}
+                <button onClick={() => { setPreviewFile(null); setPreviewContent(null); setEditing(false); setSaveMsg('') }} className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><X className="w-4 h-4" /></button>
+              </div>
             </div>
             <div className="max-h-[70vh] overflow-y-auto">
               {previewLoading ? (
@@ -110,6 +157,14 @@ export default function Files() {
                 <div className="p-5 text-sm text-red-400">{previewContent.error}</div>
               ) : previewContent?.binary ? (
                 <div className="flex flex-col items-center justify-center h-48 gap-3"><Folder className="w-10 h-10 text-[#5a5a6a]" /><p className="text-sm text-[#8a8a9a]">Binary file — preview not available</p><p className="text-xs text-[#5a5a6a]">{formatBytes(previewFile.size)}</p></div>
+              ) : editing ? (
+                <textarea
+                  ref={textareaRef}
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  className="w-full h-[60vh] p-5 text-sm font-mono text-[#e4e4ed] bg-transparent border-0 resize-none focus:outline-none"
+                  spellCheck={false}
+                />
               ) : (
                 <pre className="p-5 text-sm font-mono text-[#e4e4ed] whitespace-pre-wrap break-all leading-relaxed">{previewContent?.content}</pre>
               )}
