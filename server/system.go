@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"sync"
@@ -143,6 +144,103 @@ func getDisksFallback() ([]DiskResp, error) {
 		})
 	}
 	return res, nil
+}
+
+type BlockDevice struct {
+	Name       string         `json:"name"`
+	Size       string         `json:"size"`
+	Type       string         `json:"type"`
+	Mountpoint string         `json:"mountpoint,omitempty"`
+	Model      string         `json:"model,omitempty"`
+	FSType     string         `json:"fstype,omitempty"`
+	Serial     string         `json:"serial,omitempty"`
+	Tran       string         `json:"tran,omitempty"`
+	RM         string         `json:"rm,omitempty"`
+	ROTA       string         `json:"rota,omitempty"`
+	UUID       string         `json:"uuid,omitempty"`
+	Label      string         `json:"label,omitempty"`
+	Children   []BlockDevice  `json:"children,omitempty"`
+	IsSystem   bool           `json:"isSystem"`
+}
+
+type BlockDevicesResp struct {
+	BlockDevices []BlockDevice `json:"blockdevices"`
+}
+
+func findSystemDiskName() string {
+	// Find the root device by checking which block device backs /
+	out, err := exec.Command("lsblk", "-J", "-o", "NAME,MOUNTPOINT,TYPE").Output()
+	if err != nil {
+		return ""
+	}
+	var resp BlockDevicesResp
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return ""
+	}
+	// Walk all devices to find which partition is mounted at /
+	var findParent func(devices []BlockDevice, childName string) string
+	findParent = func(devices []BlockDevice, childName string) string {
+		for _, d := range devices {
+			if d.Name == childName {
+				return ""
+			}
+			for _, c := range d.Children {
+				if c.Name == childName {
+					return d.Name
+				}
+				// Recursion for deeper nesting
+				if len(c.Children) > 0 {
+					if p := findParent(c.Children, childName); p != "" {
+						return d.Name
+					}
+				}
+			}
+		}
+		return ""
+	}
+
+	// Walk all block devices directly
+	var walk func(devices []BlockDevice)
+	rootPart := ""
+	walk = func(devices []BlockDevice) {
+		for _, d := range devices {
+			if d.Type == "part" && d.Mountpoint == "/" {
+				rootPart = d.Name
+				return
+			}
+			if len(d.Children) > 0 {
+				walk(d.Children)
+			}
+		}
+	}
+	walk(resp.BlockDevices)
+
+	if rootPart == "" {
+		return ""
+	}
+
+	return findParent(resp.BlockDevices, rootPart)
+}
+
+func getBlockDevices() ([]BlockDevice, error) {
+	cmd := exec.Command("lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,MODEL,FSTYPE,SERIAL,TRAN,RM,ROTA,UUID,LABEL")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, err
+	}
+	var resp BlockDevicesResp
+	if err := json.Unmarshal(out, &resp); err != nil {
+		return nil, err
+	}
+	sysDisk := findSystemDiskName()
+	var disks []BlockDevice
+	for _, d := range resp.BlockDevices {
+		if d.Type == "disk" && !strings.HasPrefix(d.Name, "loop") && !strings.HasPrefix(d.Name, "zram") {
+			d.IsSystem = d.Name == sysDisk
+			disks = append(disks, d)
+		}
+	}
+	return disks, nil
 }
 
 func parseUint64(s string) uint64 {

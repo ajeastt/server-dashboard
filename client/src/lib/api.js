@@ -16,6 +16,7 @@ export const api = {
   system: {
     info: () => fetchJson('/system/info'),
     disks: () => fetchJson('/system/disks'),
+    blockDevices: () => fetchJson('/system/block-devices'),
   },
   docker: {
     containers: () => fetchJson('/docker/containers'),
@@ -55,6 +56,17 @@ export const api = {
 
     events: () => fetchJson('/docker/events'),
     prune: () => fetchJson('/docker/prune', { method: 'POST' }),
+  },
+  storage: {
+    mounts: () => fetchJson('/storage/mounts'),
+    format: (device, label) =>
+      fetchJson('/storage/format', { method: 'POST', body: JSON.stringify({ device, label }) }),
+    unmount: (mountPoint) =>
+      fetchJson('/storage/unmount', { method: 'POST', body: JSON.stringify({ mountPoint }) }),
+    createPool: (name, mountPoints) =>
+      fetchJson('/storage/pool', { method: 'POST', body: JSON.stringify({ name, mountPoints }) }),
+    destroyPool: (name) =>
+      fetchJson(`/storage/pool/${name}`, { method: 'DELETE' }),
   },
   files: {
     list: (path = '/') => fetchJson(`/files/list?path=${encodeURIComponent(path)}`),

@@ -35,6 +35,7 @@ func main() {
 	sys := app.Group("/api/system")
 	sys.Get("/info", handleSystemInfo)
 	sys.Get("/disks", handleSystemDisks)
+	sys.Get("/block-devices", handleBlockDevices)
 
 	// ── Monitoring ──
 	mon := app.Group("/api/monitoring")
@@ -71,6 +72,14 @@ func main() {
 	d.Delete("/stacks/:name", handleDestroyStack)
 	d.Get("/stacks/:name/compose", handleGetStackCompose)
 	d.Put("/stacks/:name/compose", handleUpdateStackCompose)
+
+	// ── Storage ──
+	st := app.Group("/api/storage")
+	st.Get("/mounts", handleListMounts)
+	st.Post("/format", handleFormatDisk)
+	st.Post("/unmount", handleUnmountDevice)
+	st.Post("/pool", handleCreatePool)
+	st.Delete("/pool/:name", handleDestroyPool)
 
 	// ── Files ──
 	f := app.Group("/api/files")

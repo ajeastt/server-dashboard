@@ -23,6 +23,14 @@ func handleSystemInfo(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
+func handleBlockDevices(c *fiber.Ctx) error {
+	devices, err := getBlockDevices()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(devices)
+}
+
 func handleSystemDisks(c *fiber.Ctx) error {
 	disks, err := getDisks()
 	if err != nil {
@@ -213,6 +221,69 @@ func handlePruneNetworks(c *fiber.Ctx) error {
 }
 
 // ── System prune ──
+
+// ── Storage handlers ──
+
+func handleListMounts(c *fiber.Ctx) error {
+	mounts, err := ListManagedMounts()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(mounts)
+}
+
+func handleFormatDisk(c *fiber.Ctx) error {
+	var body struct {
+		Device string `json:"device"`
+		Label  string `json:"label"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if body.Label == "" {
+		body.Label = body.Device
+	}
+	result, err := formatDevice(body.Device, body.Label)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(result)
+}
+
+func handleUnmountDevice(c *fiber.Ctx) error {
+	var body struct {
+		MountPoint string `json:"mountPoint"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if err := unmountDevice(body.MountPoint); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+func handleCreatePool(c *fiber.Ctx) error {
+	var body struct {
+		Name        string   `json:"name"`
+		MountPoints []string `json:"mountPoints"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if err := CreateMergerFSPool(body.Name, body.MountPoints); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "name": body.Name, "mountPoint": mountPath(body.Name)})
+}
+
+func handleDestroyPool(c *fiber.Ctx) error {
+	name := c.Params("name")
+	if err := DestroyMergerFSPool(name); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
 
 func handleSystemPrune(c *fiber.Ctx) error {
 	result, err := systemPrune()
