@@ -1,6 +1,8 @@
 import { useRef, useEffect } from 'react'
 import { EditorView, basicSetup } from 'codemirror'
 import { EditorState } from '@codemirror/state'
+import { keymap } from '@codemirror/view'
+import { indentWithTab } from '@codemirror/commands'
 import { yaml } from '@codemirror/lang-yaml'
 import { oneDark } from '@codemirror/theme-one-dark'
 
@@ -19,6 +21,7 @@ export default function CodeEditor({ value, onChange, lang, placeholder, minHeig
 
     const extensions = [
       basicSetup,
+      keymap.of([indentWithTab]),
       oneDark,
       updateListener,
       EditorView.theme({
