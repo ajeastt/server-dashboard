@@ -38,7 +38,7 @@ export default function Storage() {
     setError('')
     Promise.all([
       api.system.blockDevices().then(setDisks),
-      api.storage.mounts().then(setMounts).catch(() => {}),
+      api.storage.mounts().then((d) => setMounts(Array.isArray(d) ? d : [])).catch(() => {}),
     ]).catch((e) => setError(e.message)).finally(() => setLoading(false))
   }
 

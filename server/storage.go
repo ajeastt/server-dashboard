@@ -173,7 +173,7 @@ func ListManagedMounts() ([]FormatResult, error) {
 	entries, err := os.ReadDir(mountBase)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil
+			return []FormatResult{}, nil
 		}
 		return nil, err
 	}
