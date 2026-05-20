@@ -839,7 +839,12 @@ func deployStack(name, content string) error {
 }
 
 func restartStack(name string) error {
-	cmd := exec.Command("docker", "compose", "-p", name, "restart")
+	dir, err := getStackComposeDir(name)
+	if err != nil {
+		return err
+	}
+	cmd := exec.Command("docker", "compose", "-p", name, "up", "-d")
+	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%s: %s", strings.TrimSpace(err.Error()), strings.TrimSpace(string(out)))
 	}
@@ -865,7 +870,12 @@ func updateStackImages(name string) error {
 }
 
 func destroyStack(name string) error {
+	dir, err := getStackComposeDir(name)
+	if err != nil {
+		return err
+	}
 	cmd := exec.Command("docker", "compose", "-p", name, "down", "--volumes", "--remove-orphans")
+	cmd.Dir = dir
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("%s: %s", strings.TrimSpace(err.Error()), strings.TrimSpace(string(out)))
 	}
