@@ -152,10 +152,7 @@ func handleWebSocket(c *websocket.Conn) {
 
 		case "terminal-input":
 			if termConn != nil {
-				data, err := base64.StdEncoding.DecodeString(msg.Data)
-				if err == nil {
-					termConn.Write(data)
-				}
+				termConn.Write([]byte(msg.Data))
 			}
 
 		case "terminal-resize":
