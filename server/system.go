@@ -155,8 +155,8 @@ type BlockDevice struct {
 	FSType     string         `json:"fstype,omitempty"`
 	Serial     string         `json:"serial,omitempty"`
 	Tran       string         `json:"tran,omitempty"`
-	RM         string         `json:"rm,omitempty"`
-	ROTA       string         `json:"rota,omitempty"`
+	RM         interface{}    `json:"rm,omitempty"`
+	ROTA       interface{}    `json:"rota,omitempty"`
 	UUID       string         `json:"uuid,omitempty"`
 	Label      string         `json:"label,omitempty"`
 	Children   []BlockDevice  `json:"children,omitempty"`
@@ -222,6 +222,37 @@ func findSystemDiskName() string {
 	return findParent(resp.BlockDevices, rootPart)
 }
 
+func normalizeBlockDevice(d *BlockDevice) {
+	// lsblk can output RM/ROTA as bool or string depending on version; normalize to string
+	if d.RM != nil {
+		switch v := d.RM.(type) {
+		case bool:
+			if v {
+				d.RM = "1"
+			} else {
+				d.RM = "0"
+			}
+		case string:
+			// keep as-is
+		}
+	}
+	if d.ROTA != nil {
+		switch v := d.ROTA.(type) {
+		case bool:
+			if v {
+				d.ROTA = "1"
+			} else {
+				d.ROTA = "0"
+			}
+		case string:
+			// keep as-is
+		}
+	}
+	for i := range d.Children {
+		normalizeBlockDevice(&d.Children[i])
+	}
+}
+
 func getBlockDevices() ([]BlockDevice, error) {
 	cmd := exec.Command("lsblk", "-J", "-o", "NAME,SIZE,TYPE,MOUNTPOINT,MODEL,FSTYPE,SERIAL,TRAN,RM,ROTA,UUID,LABEL")
 	out, err := cmd.Output()
@@ -236,6 +267,7 @@ func getBlockDevices() ([]BlockDevice, error) {
 	var disks []BlockDevice
 	for _, d := range resp.BlockDevices {
 		if d.Type == "disk" && !strings.HasPrefix(d.Name, "loop") && !strings.HasPrefix(d.Name, "zram") {
+			normalizeBlockDevice(&d)
 			d.IsSystem = d.Name == sysDisk
 			disks = append(disks, d)
 		}
