@@ -4,6 +4,7 @@ import {
   Gauge,
   Container,
   HardDrive,
+  Database,
   Share2,
   FolderTree,
   Eraser,
@@ -15,6 +16,7 @@ import { formatBytes } from '../lib/utils'
 const links = [
   { to: '/', label: 'Dashboard', icon: Gauge },
   { to: '/containers', label: 'Containers', icon: Container },
+  { to: '/storage', label: 'Storage', icon: Database },
   { to: '/volumes', label: 'Volumes', icon: HardDrive },
   { to: '/networks', label: 'Networks', icon: Share2 },
   { to: '/files', label: 'Files', icon: FolderTree },

@@ -4,6 +4,7 @@ import Dashboard from './pages/Dashboard.jsx'
 import Containers from './pages/Containers.jsx'
 import ContainerDetail from './pages/ContainerDetail.jsx'
 import Volumes from './pages/Volumes.jsx'
+import Storage from './pages/Storage.jsx'
 import Networks from './pages/Networks.jsx'
 import Files from './pages/Files.jsx'
 
@@ -16,6 +17,7 @@ export default function App() {
         <Route path="/containers/:id" element={<ContainerDetail />} />
         <Route path="/volumes" element={<Volumes />} />
         <Route path="/networks" element={<Networks />} />
+        <Route path="/storage" element={<Storage />} />
         <Route path="/files" element={<Files />} />
         <Route path="/stacks" element={<Navigate to="/containers" replace />} />
       </Route>

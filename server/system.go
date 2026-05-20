@@ -51,7 +51,7 @@ func getSystemInfo() (*SystemInfoResp, error) {
 // ── Disks (via df to match Node behavior with /host mount) ──
 
 func getDisks() ([]DiskResp, error) {
-	cmd := exec.Command("df", "-B1", "--output=source,target,size,used,avail,pcent")
+	cmd := exec.Command("df", "-T", "-B1", "--output=source,fstype,target,size,used,avail,pcent")
 	out, err := cmd.Output()
 	if err != nil {
 		return getDisksFallback()
@@ -64,6 +64,7 @@ func getDisks() ([]DiskResp, error) {
 
 	type devInfo struct {
 		source  string
+		fstype  string
 		mount   string
 		size    uint64
 		used    uint64
@@ -81,24 +82,25 @@ func getDisks() ([]DiskResp, error) {
 		if !strings.HasPrefix(source, "/dev/") || strings.HasPrefix(source, "/dev/loop") {
 			continue
 		}
-		mount := parts[1]
+		fstype := parts[1]
+		mount := parts[2]
 		if mount == "/host" {
 			mount = "/"
 		} else if strings.HasPrefix(mount, "/host/") {
 			mount = strings.TrimPrefix(mount, "/host")
 		}
 
-		size := parseUint64(parts[2])
-		used := parseUint64(parts[3])
-		free := parseUint64(parts[4])
-		percent := parseFloat(parts[5])
+		size := parseUint64(parts[3])
+		used := parseUint64(parts[4])
+		free := parseUint64(parts[5])
+		percent := parseFloat(parts[6])
 
 		if existing, ok := seen[source]; ok {
 			if len(mount) < len(existing.mount) {
 				continue
 			}
 		}
-		seen[source] = &devInfo{source, mount, size, used, free, percent}
+		seen[source] = &devInfo{source, fstype, mount, size, used, free, percent}
 	}
 
 	res := make([]DiskResp, 0, len(seen))
@@ -106,6 +108,7 @@ func getDisks() ([]DiskResp, error) {
 		res = append(res, DiskResp{
 			FS:      d.source,
 			Mount:   d.mount,
+			FSType:  d.fstype,
 			Size:    d.size,
 			Used:    d.used,
 			Free:    d.free,
@@ -132,6 +135,7 @@ func getDisksFallback() ([]DiskResp, error) {
 		res = append(res, DiskResp{
 			FS:      p.Device,
 			Mount:   p.Mountpoint,
+			FSType:  p.Fstype,
 			Size:    usage.Total,
 			Used:    usage.Used,
 			Free:    usage.Free,

@@ -168,6 +168,7 @@ type CheckUpdateResp struct {
 type DiskResp struct {
 	FS      string  `json:"fs"`
 	Mount   string  `json:"mount"`
+	FSType  string  `json:"fstype"`
 	Size    uint64  `json:"size"`
 	Used    uint64  `json:"used"`
 	Free    uint64  `json:"free"`
