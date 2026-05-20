@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Download, Check, Play, Square, Loader } from 'lucide-react'
 import { api } from '../lib/api'
 import StackUpdateModal from '../components/StackUpdateModal'
-import YamlEditor from '../components/YamlEditor'
+import CodeEditor from '../components/CodeEditor'
 
 export default function Containers() {
   const [containers, setContainers] = useState([])
@@ -319,7 +319,7 @@ export default function Containers() {
               <div>
                 <label className="block text-xs font-medium text-[#8a8a9a] mb-1.5">docker-compose.yml</label>
                 <div className="border border-base-700/60 rounded-lg overflow-hidden">
-                  <YamlEditor value={composeYaml} onChange={setComposeYaml} placeholder={`services:\n  app:\n    image: nginx:latest\n    ports:\n      - "80:80"`} minHeight="200px" />
+                  <CodeEditor lang="yaml" value={composeYaml} onChange={setComposeYaml} placeholder={`services:\n  app:\n    image: nginx:latest\n    ports:\n      - "80:80"`} minHeight="200px" />
                 </div>
               </div>
               {validMsg && <div className={`p-3 rounded-lg border text-sm ${validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>{validMsg.text}</div>}
@@ -351,7 +351,7 @@ export default function Containers() {
               <div className="p-10 flex justify-center"><Loader className="w-5 h-5 animate-spin text-[#8a8a9a]" /></div>
             ) : (
               <form onSubmit={handleSave} className="p-5 space-y-4">
-                <div className="border border-base-700/60 rounded-lg overflow-hidden"><YamlEditor value={editYaml} onChange={setEditYaml} minHeight="300px" /></div>
+                <div className="border border-base-700/60 rounded-lg overflow-hidden"><CodeEditor lang="yaml" value={editYaml} onChange={setEditYaml} minHeight="300px" /></div>
                 {validMsg && <div className={`p-3 rounded-lg border text-sm ${validMsg.type === 'success' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400' : 'bg-red-500/10 border-red-500/20 text-red-400'}`}>{validMsg.text}</div>}
                 {error && <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-sm text-red-400">{error}</div>}
                 <div className="flex justify-end gap-2 pt-2">
