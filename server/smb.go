@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"log"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -234,7 +235,7 @@ func handleSmbAddShare(c *fiber.Ctx) error {
 }
 
 func handleSmbUpdateShare(c *fiber.Ctx) error {
-	name := c.Params("name")
+	name, _ := url.QueryUnescape(c.Params("name"))
 	if name == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "name required"})
 	}
@@ -305,7 +306,7 @@ func handleSmbUpdateShare(c *fiber.Ctx) error {
 }
 
 func handleSmbRemoveShare(c *fiber.Ctx) error {
-	name := c.Params("name")
+	name, _ := url.QueryUnescape(c.Params("name"))
 	if name == "" {
 		return c.Status(400).JSON(fiber.Map{"error": "name required"})
 	}
