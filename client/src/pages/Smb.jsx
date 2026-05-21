@@ -29,14 +29,25 @@ export default function Smb() {
 
   const doInstall = async () => {
     setInstalling(true)
-    setMsg(null)
+    setMsg({ type: 'info', text: 'Installing Samba...' })
     try {
       await api.smb.install()
-      setMsg({ type: 'info', text: 'Installation started in background. Check back in a minute.' })
-      setTimeout(fetchAll, 60000)
+      const poll = setInterval(async () => {
+        try {
+          const s = await api.smb.status()
+          if (s.installed) {
+            clearInterval(poll)
+            setInstalling(false)
+            setMsg({ type: 'success', text: 'Samba installed successfully' })
+            setStatus(s)
+            api.smb.shares().then(setShares).catch(() => {})
+          }
+        } catch {}
+      }, 3000)
     } catch (err) {
+      setInstalling(false)
       setMsg({ type: 'error', text: err.message })
-    } finally { setInstalling(false) }
+    }
   }
 
   const doService = async (action) => {
