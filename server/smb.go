@@ -278,12 +278,9 @@ func handleSmbUsers(c *fiber.Ctx) error {
 		return c.JSON([]SmbUser{})
 	}
 	lines := strings.Split(out, "\n")
-	var users []SmbUser
+	users := make([]SmbUser, 0)
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		if line == "" {
-			continue
-		}
 		if idx := strings.Index(line, ":"); idx >= 0 {
 			users = append(users, SmbUser{Username: line[:idx]})
 		}
