@@ -96,6 +96,7 @@ func main() {
 	smb.Post("/service/:action", handleSmbService)
 	smb.Get("/shares", handleSmbShares)
 	smb.Post("/shares", handleSmbAddShare)
+	smb.Put("/shares/:name", handleSmbUpdateShare)
 	smb.Delete("/shares/:name", handleSmbRemoveShare)
 	smb.Get("/users", handleSmbUsers)
 	smb.Post("/users", handleSmbAddUser)

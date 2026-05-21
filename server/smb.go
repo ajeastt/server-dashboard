@@ -233,6 +233,77 @@ func handleSmbAddShare(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+func handleSmbUpdateShare(c *fiber.Ctx) error {
+	name := c.Params("name")
+	if name == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "name required"})
+	}
+
+	var share SmbShare
+	if err := c.BodyParser(&share); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if share.Path == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "path required"})
+	}
+	share.Name = name
+
+	data, err := os.ReadFile(smbConfPath)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	lines := strings.Split(string(data), "\n")
+	var out []string
+	skip := false
+	found := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "[") && strings.HasSuffix(trimmed, "]") {
+			sectionName := trimmed[1 : len(trimmed)-1]
+			if sectionName == name {
+				skip = true
+				found = true
+				// Append the updated share block
+				out = append(out, fmt.Sprintf("[%s]", name))
+				out = append(out, fmt.Sprintf("  path = %s", share.Path))
+				if share.Comment != "" {
+					out = append(out, fmt.Sprintf("  comment = %s", share.Comment))
+				}
+				out = append(out, fmt.Sprintf("  browseable = %s", ifEmpty(share.Browseable, "yes")))
+				out = append(out, fmt.Sprintf("  read only = %s", ifEmpty(share.ReadOnly, "no")))
+				out = append(out, fmt.Sprintf("  guest ok = %s", ifEmpty(share.GuestOK, "no")))
+				if share.ValidUsers != "" {
+					out = append(out, fmt.Sprintf("  valid users = %s", share.ValidUsers))
+				}
+				if share.CreateMask != "" {
+					out = append(out, fmt.Sprintf("  create mask = %s", share.CreateMask))
+				}
+				if share.DirMask != "" {
+					out = append(out, fmt.Sprintf("  directory mask = %s", share.DirMask))
+				}
+				continue
+			}
+			skip = false
+		}
+		if !skip {
+			out = append(out, line)
+		}
+	}
+
+	if !found {
+		return c.Status(404).JSON(fiber.Map{"error": "share not found"})
+	}
+
+	if err := os.WriteFile(smbConfPath, []byte(strings.Join(out, "\n")), 0644); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+
+	chrootHost("smbcontrol", "smbd", "reload-config")
+
+	return c.JSON(fiber.Map{"success": true})
+}
+
 func handleSmbRemoveShare(c *fiber.Ctx) error {
 	name := c.Params("name")
 	if name == "" {
@@ -304,6 +375,12 @@ func handleSmbAddUser(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "username and password required"})
 	}
 
+	if _, err := chrootHost("id", req.Username); err != nil {
+		if out, err := chrootHost("useradd", "-M", "-N", req.Username); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("useradd failed: %s (output: %s)", err.Error(), out)})
+		}
+	}
+
 	cmd := exec.Command("chroot", "/host", "smbpasswd", "-a", "-s", req.Username)
 	cmd.Stdin = strings.NewReader(req.Password + "\n" + req.Password + "\n")
 	out, err := cmd.CombinedOutput()
@@ -321,6 +398,11 @@ func handleSmbRemoveUser(c *fiber.Ctx) error {
 	out, err := chrootHost("smbpasswd", "-x", username)
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("smbpasswd failed: %s (output: %s)", err.Error(), out)})
+	}
+	// Also remove Linux system user if it was created for SMB
+	if _, err := chrootHost("userdel", username); err != nil {
+		// Ignore errors — user might be a pre-existing system account
+		log.Printf("SMB: userdel %s: %v", username, err)
 	}
 	return c.JSON(fiber.Map{"success": true})
 }

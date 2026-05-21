@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Server, FolderOpen, Plus, Trash2, Play, Square, RefreshCw, Loader, AlertCircle, CheckCircle, Download, X, User } from 'lucide-react'
+import { Server, FolderOpen, Plus, Trash2, Play, Square, RefreshCw, Loader, AlertCircle, CheckCircle, Download, X, User, Pencil } from 'lucide-react'
 import { api } from '../lib/api'
 
 export default function Smb() {
@@ -10,6 +10,7 @@ export default function Smb() {
   const [acting, setActing] = useState(null)
   const [msg, setMsg] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
+  const [editingShare, setEditingShare] = useState(null)
   const [form, setForm] = useState({ name: '', path: '', comment: '', readOnly: 'no', guestOk: 'no', validUsers: '' })
   const [users, setUsers] = useState([])
   const [showAddUser, setShowAddUser] = useState(false)
@@ -70,12 +71,31 @@ export default function Smb() {
     e.preventDefault()
     setMsg(null)
     try {
-      await api.smb.addShare(form)
-      setMsg({ type: 'success', text: `Share "${form.name}" created` })
+      if (editingShare) {
+        await api.smb.updateShare(editingShare.name, form)
+        setMsg({ type: 'success', text: `Share "${form.name}" updated` })
+      } else {
+        await api.smb.addShare(form)
+        setMsg({ type: 'success', text: `Share "${form.name}" created` })
+      }
       setShowAdd(false)
+      setEditingShare(null)
       setForm({ name: '', path: '', comment: '', readOnly: 'no', guestOk: 'no', validUsers: '' })
       api.smb.shares().then(setShares).catch(() => {})
     } catch (err) { setMsg({ type: 'error', text: err.message }) }
+  }
+
+  const startEdit = (share) => {
+    setEditingShare(share)
+    setForm({
+      name: share.name,
+      path: share.path || '',
+      comment: share.comment || '',
+      readOnly: share.readOnly || 'no',
+      guestOk: share.guestOk || 'no',
+      validUsers: share.validUsers || '',
+    })
+    setShowAdd(true)
   }
 
   const doAddUser = async (e) => {
@@ -212,6 +232,7 @@ export default function Smb() {
                       </div>
                       <p className="text-xs text-[#8a8a9a] mt-0.5 font-mono">{s.path}{s.comment ? ` — ${s.comment}` : ''}</p>
                     </div>
+                    <button onClick={() => startEdit(s)} className="btn-ghost p-1.5 hover:text-accent-400"><Pencil className="w-3.5 h-3.5" /></button>
                     <button onClick={() => doRemoveShare(s.name)} className="btn-ghost p-1.5 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 ))}
@@ -270,17 +291,17 @@ export default function Smb() {
           )}
 
           {showAdd && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => { setShowAdd(false); setMsg(null) }}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => { setShowAdd(false); setEditingShare(null); setMsg(null) }}>
               <div className="w-full max-w-lg mx-4 rounded-xl border border-base-700/60 bg-base-900 shadow-xl animate-fade-in" onClick={(e) => e.stopPropagation()}>
                 <div className="flex items-center justify-between px-5 py-3.5 border-b border-base-700/40">
-                  <h2 className="text-sm font-semibold text-[#e4e4ed]">Add SMB Share</h2>
-                  <button onClick={() => setShowAdd(false)} className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><X className="w-4 h-4" /></button>
+                  <h2 className="text-sm font-semibold text-[#e4e4ed]">{editingShare ? 'Edit SMB Share' : 'Add SMB Share'}</h2>
+                  <button onClick={() => { setShowAdd(false); setEditingShare(null) }} className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><X className="w-4 h-4" /></button>
                 </div>
                 <form onSubmit={doAddShare} className="p-5 space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-xs font-medium text-[#8a8a9a] mb-1.5">Share Name</label>
-                      <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="media" required />
+                      <input type="text" value={form.name} onChange={(e) => setForm(p => ({ ...p, name: e.target.value }))} className="input" placeholder="media" required disabled={!!editingShare} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-[#8a8a9a] mb-1.5">Read Only</label>
@@ -312,8 +333,8 @@ export default function Smb() {
                     </div>
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
-                    <button type="button" onClick={() => setShowAdd(false)} className="btn-secondary">Cancel</button>
-                    <button type="submit" className="btn-primary"><Plus className="w-4 h-4" /> Add Share</button>
+                    <button type="button" onClick={() => { setShowAdd(false); setEditingShare(null) }} className="btn-secondary">Cancel</button>
+                    <button type="submit" className="btn-primary"><Plus className="w-4 h-4" /> {editingShare ? 'Update Share' : 'Add Share'}</button>
                   </div>
                 </form>
               </div>

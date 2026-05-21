@@ -91,6 +91,7 @@ export const api = {
     service: (action) => fetchJson(`/smb/service/${action}`, { method: 'POST' }),
     shares: () => fetchJson('/smb/shares'),
     addShare: (share) => fetchJson('/smb/shares', { method: 'POST', body: JSON.stringify(share) }),
+    updateShare: (name, share) => fetchJson(`/smb/shares/${encodeURIComponent(name)}`, { method: 'PUT', body: JSON.stringify(share) }),
     removeShare: (name) => fetchJson(`/smb/shares/${encodeURIComponent(name)}`, { method: 'DELETE' }),
     users: () => fetchJson('/smb/users'),
     addUser: (username, password) => fetchJson('/smb/users', { method: 'POST', body: JSON.stringify({ username, password }) }),
