@@ -10,6 +10,7 @@ import Storage from './pages/Storage'
 import Networks from './pages/Networks'
 import Files from './pages/Files'
 import Login from './pages/Login'
+import ChangePassword from './pages/ChangePassword'
 
 function ProtectedRoute({ children }) {
   const { isAuthenticated } = useAuth()
@@ -22,6 +23,7 @@ export default function App() {
     <AuthProvider>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
         <Route element={
           <ProtectedRoute>
             <Layout />

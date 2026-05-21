@@ -128,3 +128,10 @@ export function connectMetrics(callback) {
   ws.send({ type: 'subscribe', channel: 'metrics' })
   return () => { ws.send({ type: 'unsubscribe', channel: 'metrics' }); ws.close() }
 }
+
+export function changePassword(currentPassword, newPassword) {
+  return fetchJson('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ currentPassword, newPassword }),
+  })
+}

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../components/AuthProvider'
-import { useNavigate } from 'react-router-dom'
-import { Server, Loader, AlertCircle } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { Server, Loader, AlertCircle, CheckCircle } from 'lucide-react'
 
 export default function Login() {
   const [username, setUsername] = useState('')
@@ -10,14 +10,17 @@ export default function Login() {
   const [loading, setLoading] = useState(false)
   const { login } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const changed = searchParams.get('changed') === '1'
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
     setLoading(true)
     try {
-      await login(username, password)
-      navigate('/')
+      const data = await login(username, password)
+      if (data.mustChangePassword) navigate('/change-password')
+      else navigate('/')
     } catch (err) {
       setError(err.message)
     } finally {
@@ -37,6 +40,12 @@ export default function Login() {
         <div className="card p-6">
           <h1 className="text-sm font-semibold text-[#e4e4ed] mb-1">Sign in</h1>
           <p className="text-xs text-[#8a8a9a] mb-5">Enter your credentials to access the dashboard</p>
+          {changed && (
+            <div className="flex items-center gap-2 p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-sm text-emerald-400 mb-4">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              Password changed. Please sign in with your new password.
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-[#8a8a9a] mb-1.5">Username</label>
