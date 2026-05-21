@@ -39,7 +39,7 @@ func chrootHost(args ...string) (string, error) {
 }
 
 func nsenterSystemctl(action, service string) (string, error) {
-	cmd := exec.Command("nsenter", "--target", "1", "--mount", "--root", "/host", "--wd", "/host", "systemctl", action, service)
+	cmd := exec.Command("nsenter", "--target", "1", "--mount", "chroot", "/host", "systemctl", action, service)
 	out, err := cmd.CombinedOutput()
 	return strings.TrimSpace(string(out)), err
 }
