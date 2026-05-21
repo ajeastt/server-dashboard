@@ -50,6 +50,17 @@ func handleListContainers(c *fiber.Ctx) error {
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+	showAll := c.Query("all") == "1"
+	if !showAll {
+		filtered := make([]ContainerResp, 0, len(ctrs))
+		for _, ct := range ctrs {
+			if ct.Name == "server-dashboard" || strings.HasPrefix(ct.Name, "dockge") {
+				continue
+			}
+			filtered = append(filtered, ct)
+		}
+		ctrs = filtered
+	}
 	return c.JSON(ctrs)
 }
 
