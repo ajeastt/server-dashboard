@@ -44,19 +44,18 @@ func handleSmbStatus(c *fiber.Ctx) error {
 	}
 
 	running := false
-	out, err := chrootHost("systemctl", "is-active", "smb")
-	if err != nil || strings.TrimSpace(out) != "active" {
-		out, _ = chrootHost("pgrep", "-x", "smbd")
-		if out != "" {
-			running = true
-		}
-	} else {
+	out, err := chrootHost("busctl", "get-property", "org.freedesktop.systemd1",
+		"/org/freedesktop/systemd1/unit/smb_2eservice",
+		"org.freedesktop.systemd1.Unit", "ActiveState")
+	if err == nil && strings.TrimSpace(out) == `s "active"` {
 		running = true
 	}
 
 	enabled := false
-	out, _ = chrootHost("systemctl", "is-enabled", "smb")
-	if strings.TrimSpace(out) == "enabled" {
+	out, _ = chrootHost("busctl", "get-property", "org.freedesktop.systemd1",
+		"/org/freedesktop/systemd1/unit/smb_2eservice",
+		"org.freedesktop.systemd1.Unit", "UnitFileState")
+	if strings.TrimSpace(out) == `s "enabled"` {
 		enabled = true
 	}
 
@@ -85,9 +84,33 @@ func handleSmbService(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid action"})
 	}
 
-	out, err := chrootHost("systemctl", action, "smb")
+	var args []string
+	switch action {
+	case "start":
+		args = []string{"busctl", "call", "org.freedesktop.systemd1",
+			"/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager",
+			"StartUnit", "ss", "smb.service", "replace"}
+	case "stop":
+		args = []string{"busctl", "call", "org.freedesktop.systemd1",
+			"/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager",
+			"StopUnit", "ss", "smb.service", "replace"}
+	case "restart":
+		args = []string{"busctl", "call", "org.freedesktop.systemd1",
+			"/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager",
+			"RestartUnit", "ss", "smb.service", "replace"}
+	case "enable":
+		args = []string{"busctl", "call", "org.freedesktop.systemd1",
+			"/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager",
+			"EnableUnitFiles", "asbb", "smb.service", "0", "0"}
+	case "disable":
+		args = []string{"busctl", "call", "org.freedesktop.systemd1",
+			"/org/freedesktop/systemd1", "org.freedesktop.systemd1.Manager",
+			"DisableUnitFiles", "asb", "smb.service", "0"}
+	}
+
+	out, err := chrootHost(args...)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("systemctl failed: %s (output: %s)", err.Error(), out)})
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("busctl failed: %s (output: %s)", err.Error(), out)})
 	}
 
 	return c.JSON(fiber.Map{"success": true, "output": out})
