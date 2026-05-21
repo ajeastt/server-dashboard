@@ -89,6 +89,15 @@ func main() {
 	st.Post("/pool", handleCreatePool)
 	st.Delete("/pool/:name", handleDestroyPool)
 
+	// ── SMB ──
+	smb := app.Group("/api/smb")
+	smb.Get("/status", handleSmbStatus)
+	smb.Post("/install", handleSmbInstall)
+	smb.Post("/service/:action", handleSmbService)
+	smb.Get("/shares", handleSmbShares)
+	smb.Post("/shares", handleSmbAddShare)
+	smb.Delete("/shares/:name", handleSmbRemoveShare)
+
 	// ── Files ──
 	f := app.Group("/api/files")
 	f.Get("/list", handleFileList)

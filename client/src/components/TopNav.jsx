@@ -11,6 +11,7 @@ import {
   Server,
   LogOut,
   User,
+  Share,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from './AuthProvider'
@@ -22,6 +23,7 @@ const links = [
   { to: '/storage', label: 'Storage', icon: Database },
   { to: '/volumes', label: 'Volumes', icon: HardDrive },
   { to: '/networks', label: 'Networks', icon: Share2 },
+  { to: '/smb', label: 'SMB', icon: Share },
   { to: '/files', label: 'Files', icon: FolderTree },
 ]
 

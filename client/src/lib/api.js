@@ -85,6 +85,14 @@ export const api = {
     read: (path) => fetchJson(`/files/read?path=${encodeURIComponent(path)}`),
     write: (path, content) => fetchJson('/files/write', { method: 'PUT', body: JSON.stringify({ path, content }) }),
   },
+  smb: {
+    status: () => fetchJson('/smb/status'),
+    install: () => fetchJson('/smb/install', { method: 'POST' }),
+    service: (action) => fetchJson(`/smb/service/${action}`, { method: 'POST' }),
+    shares: () => fetchJson('/smb/shares'),
+    addShare: (share) => fetchJson('/smb/shares', { method: 'POST', body: JSON.stringify(share) }),
+    removeShare: (name) => fetchJson(`/smb/shares/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+  },
 }
 
 export function createWS() {
