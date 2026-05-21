@@ -31,15 +31,16 @@ func main() {
 		log.Fatalf("Docker client: %v", err)
 	}
 
+	// ── Auth ──
+	app.Post("/api/auth/login", handleLogin)
+	app.Use("/api", authMiddleware)
+	app.Get("/api/monitoring/health", handleHealth)
+
 	// ── System ──
 	sys := app.Group("/api/system")
 	sys.Get("/info", handleSystemInfo)
 	sys.Get("/disks", handleSystemDisks)
 	sys.Get("/block-devices", handleBlockDevices)
-
-	// ── Monitoring ──
-	mon := app.Group("/api/monitoring")
-	mon.Get("/health", handleHealth)
 
 	// ── Docker ──
 	d := app.Group("/api/docker")
@@ -89,7 +90,7 @@ func main() {
 	f.Put("/write", handleFileWrite)
 
 	// ── WebSocket ──
-	app.Get("/ws", websocket.New(handleWebSocket))
+	app.Get("/api/ws", websocket.New(handleWebSocket))
 
 	// ── Static files + SPA fallback ──
 	clientDist := "./client/dist"
@@ -97,7 +98,7 @@ func main() {
 		app.Static("/", clientDist)
 		app.Get("*", func(c *fiber.Ctx) error {
 			p := c.Path()
-			if strings.HasPrefix(p, "/api") || p == "/ws" {
+			if strings.HasPrefix(p, "/api") {
 				return fiber.ErrNotFound
 			}
 			return c.SendFile(filepath.Join(clientDist, "index.html"))
@@ -109,6 +110,22 @@ func main() {
 		port = "3001"
 	}
 	log.Printf("Server dashboard running on http://0.0.0.0:%s", port)
+
+	certFile := os.Getenv("SSL_CERT")
+	keyFile := os.Getenv("SSL_KEY")
+	if certFile != "" && keyFile != "" {
+		go func() {
+			sslPort := os.Getenv("SSL_PORT")
+			if sslPort == "" {
+				sslPort = "3443"
+			}
+			log.Printf("HTTPS listening on 0.0.0.0:%s", sslPort)
+			if err := app.ListenTLS("0.0.0.0:"+sslPort, certFile, keyFile); err != nil {
+				log.Fatalf("HTTPS server: %v", err)
+			}
+		}()
+	}
+
 	log.Fatal(app.Listen("0.0.0.0:" + port))
 }
 

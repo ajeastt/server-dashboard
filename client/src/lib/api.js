@@ -1,15 +1,26 @@
 const API = '/api';
 
+function getToken() {
+  return window.__authToken || localStorage.getItem('serverdash_token') || ''
+}
+
 async function fetchJson(url, opts = {}) {
-  const res = await fetch(`${API}${url}`, {
-    headers: { 'Content-Type': 'application/json' },
-    ...opts,
-  });
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: res.statusText }));
-    throw new Error(err.error || res.statusText);
+  const token = getToken()
+  const headers = { 'Content-Type': 'application/json' }
+  if (token) headers['Authorization'] = `Bearer ${token}`
+
+  const res = await fetch(`${API}${url}`, { headers, ...opts })
+  if (res.status === 401) {
+    localStorage.removeItem('serverdash_token')
+    localStorage.removeItem('serverdash_user')
+    window.dispatchEvent(new CustomEvent('auth:logout'))
+    throw new Error('unauthorized')
   }
-  return res.json();
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }))
+    throw new Error(err.error || res.statusText)
+  }
+  return res.json()
 }
 
 export const api = {
@@ -74,47 +85,46 @@ export const api = {
     read: (path) => fetchJson(`/files/read?path=${encodeURIComponent(path)}`),
     write: (path, content) => fetchJson('/files/write', { method: 'PUT', body: JSON.stringify({ path, content }) }),
   },
-};
-
-// ── WebSocket connection with message dispatch ──
+}
 
 export function createWS() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const ws = new WebSocket(`${protocol}//${window.location.host}/ws`);
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
+  const token = getToken()
+  const ws = new WebSocket(`${protocol}//${window.location.host}/api/ws?token=${encodeURIComponent(token)}`)
 
-  const handlers = {};
-  const queue = [];
+  const handlers = {}
+  const queue = []
 
   ws.onopen = () => {
-    queue.forEach((data) => ws.send(JSON.stringify(data)));
-    queue.length = 0;
-  };
+    queue.forEach((data) => ws.send(JSON.stringify(data)))
+    queue.length = 0
+  }
 
   ws.onmessage = (event) => {
     try {
-      const msg = JSON.parse(event.data);
-      const h = handlers[msg.type];
-      if (h) h(msg);
+      const msg = JSON.parse(event.data)
+      const h = handlers[msg.type]
+      if (h) h(msg)
     } catch {}
-  };
+  }
 
   return {
     send: (data) => {
       if (ws.readyState === ws.OPEN) {
-        ws.send(JSON.stringify(data));
+        ws.send(JSON.stringify(data))
       } else {
-        queue.push(data);
+        queue.push(data)
       }
     },
-    on: (type, fn) => { handlers[type] = fn; },
+    on: (type, fn) => { handlers[type] = fn },
     close: () => ws.close(),
     raw: ws,
-  };
+  }
 }
 
 export function connectMetrics(callback) {
-  const ws = createWS();
-  ws.on('metrics', (msg) => callback(msg.data));
-  ws.send({ type: 'subscribe', channel: 'metrics' });
-  return () => { ws.send({ type: 'unsubscribe', channel: 'metrics' }); ws.close(); };
+  const ws = createWS()
+  ws.on('metrics', (msg) => callback(msg.data))
+  ws.send({ type: 'subscribe', channel: 'metrics' })
+  return () => { ws.send({ type: 'unsubscribe', channel: 'metrics' }); ws.close() }
 }

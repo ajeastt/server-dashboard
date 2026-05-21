@@ -275,7 +275,7 @@ export default function Containers() {
                 <button onClick={() => toggleStack(stack.name)} className="w-full flex items-center gap-2.5 px-4 py-2.5 text-left hover:bg-white/[0.02] transition-all">
                   {expanded ? <ChevronDown className="w-4 h-4 text-[#5a5a6a]" /> : <ChevronRight className="w-4 h-4 text-[#5a5a6a]" />}
                   <Layers className="w-4 h-4 text-accent-400" />
-                  <span className="text-sm font-medium text-[#e4e4ed]">{stack.name}</span>
+                  <Link to={`/stacks/${stack.name}`} className="text-sm font-medium text-[#e4e4ed] hover:text-accent-400 transition-colors">{stack.name}</Link>
                   <span className={`badge ${stack.status === 'running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-[#1e1e2c] text-[#5a5a6a]'}`}>{stack.status}</span>
                   <span className="text-xs text-[#5a5a6a]">{ctrs.length} service{ctrs.length !== 1 ? 's' : ''}</span>
                   <div className="flex-1" />
@@ -292,7 +292,7 @@ export default function Containers() {
                   const s = stats[c.id]
                   const ec = exitCode(c.status)
                   return (
-                  <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/30 hover:bg-white/[0.02] transition-all ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
+                  <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/30 border-l-2 hover:bg-white/[0.02] transition-all ${c.state === 'running' ? 'border-l-emerald-500/30' : c.state === 'exited' || c.state === 'stopped' ? 'border-l-red-500/30' : 'border-l-amber-500/30'} ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
                     {statusDot(c.state)}
                     <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-[#e4e4ed] hover:text-accent-400 transition-colors truncate">{c.name}</div>
@@ -342,7 +342,7 @@ export default function Containers() {
                 const s = stats[c.id]
                 const ec = exitCode(c.status)
                 return (
-                <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/20 hover:bg-white/[0.02] transition-all ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
+                <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/20 border-l-2 hover:bg-white/[0.02] transition-all ${c.state === 'running' ? 'border-l-emerald-500/30' : c.state === 'exited' || c.state === 'stopped' ? 'border-l-red-500/30' : 'border-l-amber-500/30'} ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
                   {statusDot(c.state)}
                   <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-[#e4e4ed] hover:text-accent-400 transition-colors truncate">{c.name}</div>

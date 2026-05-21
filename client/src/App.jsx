@@ -1,26 +1,43 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
-import Layout from './components/Layout.jsx'
-import Dashboard from './pages/Dashboard.jsx'
-import Containers from './pages/Containers.jsx'
-import ContainerDetail from './pages/ContainerDetail.jsx'
-import Volumes from './pages/Volumes.jsx'
-import Storage from './pages/Storage.jsx'
-import Networks from './pages/Networks.jsx'
-import Files from './pages/Files.jsx'
+import { AuthProvider, useAuth } from './components/AuthProvider'
+import Layout from './components/Layout'
+import Dashboard from './pages/Dashboard'
+import Containers from './pages/Containers'
+import ContainerDetail from './pages/ContainerDetail'
+import StackDetail from './pages/StackDetail'
+import Volumes from './pages/Volumes'
+import Storage from './pages/Storage'
+import Networks from './pages/Networks'
+import Files from './pages/Files'
+import Login from './pages/Login'
+
+function ProtectedRoute({ children }) {
+  const { isAuthenticated } = useAuth()
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  return children
+}
 
 export default function App() {
   return (
-    <Routes>
-      <Route element={<Layout />}>
-        <Route path="/" element={<Dashboard />} />
-        <Route path="/containers" element={<Containers />} />
-        <Route path="/containers/:id" element={<ContainerDetail />} />
-        <Route path="/volumes" element={<Volumes />} />
-        <Route path="/networks" element={<Networks />} />
-        <Route path="/storage" element={<Storage />} />
-        <Route path="/files" element={<Files />} />
-        <Route path="/stacks" element={<Navigate to="/containers" replace />} />
-      </Route>
-    </Routes>
+    <AuthProvider>
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
+          <Route path="/" element={<Dashboard />} />
+          <Route path="/containers" element={<Containers />} />
+          <Route path="/containers/:id" element={<ContainerDetail />} />
+          <Route path="/stacks/:name" element={<StackDetail />} />
+          <Route path="/volumes" element={<Volumes />} />
+          <Route path="/networks" element={<Networks />} />
+          <Route path="/storage" element={<Storage />} />
+          <Route path="/files" element={<Files />} />
+          <Route path="/stacks" element={<Navigate to="/containers" replace />} />
+        </Route>
+      </Routes>
+    </AuthProvider>
   )
 }

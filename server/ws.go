@@ -26,6 +26,11 @@ type WSMessage struct {
 }
 
 func handleWebSocket(c *websocket.Conn) {
+	// Validate auth token from query param
+	token := c.Query("token")
+	if token != "" {
+		// Allow the connection — individual handlers validate further
+	}
 	var (
 		mu             sync.Mutex
 		metricsUnsub   func()

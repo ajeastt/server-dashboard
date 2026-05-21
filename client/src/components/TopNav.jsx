@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { NavLink, useNavigate } from 'react-router-dom'
 import {
   Gauge,
   Container,
@@ -9,8 +9,10 @@ import {
   FolderTree,
   Eraser,
   Server,
+  LogOut,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { useAuth } from './AuthProvider'
 import { formatBytes } from '../lib/utils'
 
 const links = [
@@ -25,6 +27,14 @@ const links = [
 export default function TopNav() {
   const [pruneOpen, setPruneOpen] = useState(false)
   const [result, setResult] = useState(null)
+  const { logout, user } = useAuth()
+  const navigate = useNavigate()
+
+  useEffect(() => {
+    const handler = () => { logout(); navigate('/login') }
+    window.addEventListener('auth:logout', handler)
+    return () => window.removeEventListener('auth:logout', handler)
+  }, [logout, navigate])
 
   const doPruneImages = async () => {
     setPruneOpen(false)
@@ -113,6 +123,14 @@ export default function TopNav() {
                   </div>
                 </>
               )}
+            </div>
+
+            {/* User / Logout */}
+            <div className="flex items-center gap-2 pl-2 border-l border-base-700/40">
+              <span className="text-xs text-[#5a5a6a] hidden sm:block">{user}</span>
+              <button onClick={() => { logout(); navigate('/login') }} className="btn-ghost text-xs p-1.5" title="Sign out">
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
             </div>
           </div>
         </div>
