@@ -87,7 +87,7 @@ func handleSmbService(c *fiber.Ctx) error {
 
 	out, err := chrootHost("systemctl", action, "smb")
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error(), "output": out})
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("systemctl failed: %s (output: %s)", err.Error(), out)})
 	}
 
 	return c.JSON(fiber.Map{"success": true, "output": out})
