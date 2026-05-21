@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -64,7 +65,14 @@ func handleSmbStatus(c *fiber.Ctx) error {
 
 func handleSmbInstall(c *fiber.Ctx) error {
 	go func() {
-		chrootHost("dnf", "install", "-y", "samba", "samba-client")
+		log.Printf("SMB: starting installation via chroot /host dnf install samba samba-client")
+		out, err := chrootHost("dnf", "install", "-y", "samba", "samba-client")
+		if err != nil {
+			log.Printf("SMB: install failed: %v", err)
+			log.Printf("SMB: output: %s", out)
+		} else {
+			log.Printf("SMB: install succeeded: %s", out)
+		}
 	}()
 
 	return c.JSON(fiber.Map{"success": true, "message": "Installation started in background"})
