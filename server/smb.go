@@ -38,24 +38,30 @@ func chrootHost(args ...string) (string, error) {
 	return strings.TrimSpace(string(out)), err
 }
 
+func nsenterSystemctl(action, service string) (string, error) {
+	cmd := exec.Command("nsenter", "--target", "1", "--mount", "systemctl", action, service)
+	out, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(out)), err
+}
+
 func handleSmbStatus(c *fiber.Ctx) error {
 	if _, err := os.Stat("/host/usr/sbin/smbd"); os.IsNotExist(err) {
 		return c.JSON(SmbStatus{Installed: false, Running: false, Enabled: false})
 	}
 
 	running := false
-	out, _ := chrootHost("systemctl", "is-active", "smb")
-	if strings.TrimSpace(out) == "active" {
-		running = true
-	} else {
+	out, err := nsenterSystemctl("is-active", "smb")
+	if err != nil || strings.TrimSpace(out) != "active" {
 		out, _ = chrootHost("pgrep", "-x", "smbd")
 		if out != "" {
 			running = true
 		}
+	} else {
+		running = true
 	}
 
 	enabled := false
-	out, _ = chrootHost("systemctl", "is-enabled", "smb")
+	out, _ = nsenterSystemctl("is-enabled", "smb")
 	if strings.TrimSpace(out) == "enabled" {
 		enabled = true
 	}
@@ -85,7 +91,7 @@ func handleSmbService(c *fiber.Ctx) error {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid action"})
 	}
 
-	out, err := chrootHost("systemctl", action, "smb")
+	out, err := nsenterSystemctl(action, "smb")
 	if err != nil {
 		out2, err2 := chrootHost("service", "smb", action)
 		if err2 != nil {
