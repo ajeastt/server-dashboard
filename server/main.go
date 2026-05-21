@@ -97,6 +97,9 @@ func main() {
 	smb.Get("/shares", handleSmbShares)
 	smb.Post("/shares", handleSmbAddShare)
 	smb.Delete("/shares/:name", handleSmbRemoveShare)
+	smb.Get("/users", handleSmbUsers)
+	smb.Post("/users", handleSmbAddUser)
+	smb.Delete("/users/:username", handleSmbRemoveUser)
 
 	// ── Files ──
 	f := app.Group("/api/files")

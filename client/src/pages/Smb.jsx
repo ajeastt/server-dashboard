@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Server, FolderOpen, Plus, Trash2, Play, Square, RefreshCw, Loader, AlertCircle, CheckCircle, Download, X } from 'lucide-react'
+import { Server, FolderOpen, Plus, Trash2, Play, Square, RefreshCw, Loader, AlertCircle, CheckCircle, Download, X, User } from 'lucide-react'
 import { api } from '../lib/api'
 
 export default function Smb() {
@@ -11,16 +11,21 @@ export default function Smb() {
   const [msg, setMsg] = useState(null)
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', path: '', comment: '', readOnly: 'no', guestOk: 'no', validUsers: '' })
+  const [users, setUsers] = useState([])
+  const [showAddUser, setShowAddUser] = useState(false)
+  const [userForm, setUserForm] = useState({ username: '', password: '' })
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
     try {
-      const [s, sh] = await Promise.all([
+      const [s, sh, u] = await Promise.all([
         api.smb.status().catch(() => ({ installed: false, running: false })),
         api.smb.shares().catch(() => []),
+        api.smb.users().catch(() => []),
       ])
       setStatus(s)
       setShares(sh)
+      setUsers(u)
     } catch {}
     setLoading(false)
   }, [])
@@ -70,6 +75,28 @@ export default function Smb() {
       setShowAdd(false)
       setForm({ name: '', path: '', comment: '', readOnly: 'no', guestOk: 'no', validUsers: '' })
       api.smb.shares().then(setShares).catch(() => {})
+    } catch (err) { setMsg({ type: 'error', text: err.message }) }
+  }
+
+  const doAddUser = async (e) => {
+    e.preventDefault()
+    setMsg(null)
+    try {
+      await api.smb.addUser(userForm.username, userForm.password)
+      setMsg({ type: 'success', text: `User "${userForm.username}" added` })
+      setShowAddUser(false)
+      setUserForm({ username: '', password: '' })
+      api.smb.users().then(setUsers).catch(() => {})
+    } catch (err) { setMsg({ type: 'error', text: err.message }) }
+  }
+
+  const doRemoveUser = async (username) => {
+    if (!confirm(`Remove SMB user "${username}"?`)) return
+    setMsg(null)
+    try {
+      await api.smb.removeUser(username)
+      setMsg({ type: 'success', text: `User "${username}" removed` })
+      api.smb.users().then(setUsers).catch(() => {})
     } catch (err) { setMsg({ type: 'error', text: err.message }) }
   }
 
@@ -191,6 +218,56 @@ export default function Smb() {
               </div>
             )}
           </div>
+
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-[#e4e4ed]">SMB Users</h2>
+              <button onClick={() => setShowAddUser(true)} className="btn-primary"><Plus className="w-4 h-4" /> Add User</button>
+            </div>
+            {users.length === 0 ? (
+              <div className="flex flex-col items-center py-10 gap-2">
+                <User className="w-8 h-8 text-[#5a5a6a]" />
+                <p className="text-sm text-[#8a8a9a]">No SMB users configured</p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {users.map((u) => (
+                  <div key={u.username} className="flex items-center gap-4 px-4 py-3 rounded-lg border border-base-700/40 bg-base-950/50">
+                    <User className="w-4 h-4 text-accent-400" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-[#e4e4ed]">{u.username}</span>
+                    </div>
+                    <button onClick={() => doRemoveUser(u.username)} className="btn-ghost p-1.5 hover:text-red-400"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {showAddUser && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => { setShowAddUser(false); setMsg(null) }}>
+              <div className="w-full max-w-md mx-4 rounded-xl border border-base-700/60 bg-base-900 shadow-xl animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between px-5 py-3.5 border-b border-base-700/40">
+                  <h2 className="text-sm font-semibold text-[#e4e4ed]">Add SMB User</h2>
+                  <button onClick={() => setShowAddUser(false)} className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><X className="w-4 h-4" /></button>
+                </div>
+                <form onSubmit={doAddUser} className="p-5 space-y-4">
+                  <div>
+                    <label className="block text-xs font-medium text-[#8a8a9a] mb-1.5">Username</label>
+                    <input type="text" value={userForm.username} onChange={(e) => setUserForm(p => ({ ...p, username: e.target.value }))} className="input" placeholder="adam" required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[#8a8a9a] mb-1.5">Password</label>
+                    <input type="password" value={userForm.password} onChange={(e) => setUserForm(p => ({ ...p, password: e.target.value }))} className="input" placeholder="SMB password" required minLength={1} />
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <button type="button" onClick={() => setShowAddUser(false)} className="btn-secondary">Cancel</button>
+                    <button type="submit" className="btn-primary"><Plus className="w-4 h-4" /> Add User</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
 
           {showAdd && (
             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70" onClick={() => { setShowAdd(false); setMsg(null) }}>

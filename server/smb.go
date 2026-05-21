@@ -268,6 +268,62 @@ func handleSmbRemoveShare(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+type SmbUser struct {
+	Username string `json:"username"`
+}
+
+func handleSmbUsers(c *fiber.Ctx) error {
+	out, err := chrootHost("pdbedit", "-L")
+	if err != nil {
+		return c.JSON([]SmbUser{})
+	}
+	lines := strings.Split(out, "\n")
+	var users []SmbUser
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		if idx := strings.Index(line, ":"); idx >= 0 {
+			users = append(users, SmbUser{Username: line[:idx]})
+		}
+	}
+	return c.JSON(users)
+}
+
+func handleSmbAddUser(c *fiber.Ctx) error {
+	var req struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&req); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if req.Username == "" || req.Password == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "username and password required"})
+	}
+
+	cmd := exec.Command("chroot", "/host", "smbpasswd", "-a", "-s", req.Username)
+	cmd.Stdin = strings.NewReader(req.Password + "\n" + req.Password + "\n")
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("smbpasswd failed: %s (output: %s)", err.Error(), string(out))})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
+func handleSmbRemoveUser(c *fiber.Ctx) error {
+	username := c.Params("username")
+	if username == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "username required"})
+	}
+	out, err := chrootHost("smbpasswd", "-x", username)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("smbpasswd failed: %s (output: %s)", err.Error(), out)})
+	}
+	return c.JSON(fiber.Map{"success": true})
+}
+
 func ifEmpty(s, def string) string {
 	if s == "" {
 		return def

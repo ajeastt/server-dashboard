@@ -92,6 +92,9 @@ export const api = {
     shares: () => fetchJson('/smb/shares'),
     addShare: (share) => fetchJson('/smb/shares', { method: 'POST', body: JSON.stringify(share) }),
     removeShare: (name) => fetchJson(`/smb/shares/${encodeURIComponent(name)}`, { method: 'DELETE' }),
+    users: () => fetchJson('/smb/users'),
+    addUser: (username, password) => fetchJson('/smb/users', { method: 'POST', body: JSON.stringify({ username, password }) }),
+    removeUser: (username) => fetchJson(`/smb/users/${encodeURIComponent(username)}`, { method: 'DELETE' }),
   },
 }
 
