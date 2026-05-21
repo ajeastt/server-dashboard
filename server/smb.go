@@ -228,6 +228,8 @@ func handleSmbAddShare(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
 
+	chrootHost("smbcontrol", "smbd", "reload-config")
+
 	return c.JSON(fiber.Map{"success": true})
 }
 
@@ -264,6 +266,8 @@ func handleSmbRemoveShare(c *fiber.Ctx) error {
 	if err := os.WriteFile(smbConfPath, []byte(strings.Join(out, "\n")), 0644); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}
+
+	chrootHost("smbcontrol", "smbd", "reload-config")
 
 	return c.JSON(fiber.Map{"success": true})
 }
