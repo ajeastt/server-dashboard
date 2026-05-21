@@ -64,17 +64,16 @@ export default function Containers() {
 
   const fetchAll = useCallback(async () => {
     try {
-      const [ctrs, stks, allStats] = await Promise.all([
+      const [ctrs, stks] = await Promise.all([
         api.docker.containers(),
         api.docker.stacks(),
-        api.docker.allStats().catch(() => ({})),
       ])
       setContainers(ctrs)
       setStacks(stks)
-      setStats(allStats || {})
+      setLoading(false)
+      api.docker.allStats().then(s => setStats(s || {})).catch(() => {})
     } catch (err) {
       console.error('Failed to fetch:', err)
-    } finally {
       setLoading(false)
     }
   }, [])
