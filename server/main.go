@@ -31,9 +31,11 @@ func main() {
 		log.Fatalf("Docker client: %v", err)
 	}
 
-	// ── Auth ──
-	app.Post("/api/auth/login", handleLogin)
+	// ── Auth middleware — applied to all /api routes ──
 	app.Use("/api", authMiddleware)
+
+	// Routes excluded from auth (checked inside middleware)
+	app.Post("/api/auth/login", handleLogin)
 	app.Get("/api/monitoring/health", handleHealth)
 
 	// ── System ──
