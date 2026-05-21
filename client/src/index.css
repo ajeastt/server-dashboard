@@ -5,7 +5,7 @@
 @layer base {
   * {
     scrollbar-width: thin;
-    scrollbar-color: rgba(138, 138, 154, 0.3) transparent;
+    scrollbar-color: rgba(100, 100, 115, 0.65) transparent;
   }
 
   *::-webkit-scrollbar {
@@ -18,12 +18,12 @@
   }
 
   *::-webkit-scrollbar-thumb {
-    background-color: rgba(138, 138, 154, 0.25);
+    background-color: rgba(100, 100, 115, 0.65);
     border-radius: 999px;
   }
 
   *::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(138, 138, 154, 0.5);
+    background-color: rgba(100, 100, 115, 0.85);
   }
 
   body {
