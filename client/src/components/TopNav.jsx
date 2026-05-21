@@ -10,6 +10,7 @@ import {
   Eraser,
   Server,
   LogOut,
+  User,
 } from 'lucide-react'
 import { api } from '../lib/api'
 import { useAuth } from './AuthProvider'
@@ -26,6 +27,7 @@ const links = [
 
 export default function TopNav() {
   const [pruneOpen, setPruneOpen] = useState(false)
+  const [userOpen, setUserOpen] = useState(false)
   const [result, setResult] = useState(null)
   const { logout, user } = useAuth()
   const navigate = useNavigate()
@@ -104,7 +106,7 @@ export default function TopNav() {
             {/* Prune */}
             <div className="relative">
               <button
-                onClick={() => setPruneOpen(!pruneOpen)}
+                onClick={() => { setUserOpen(false); setPruneOpen(!pruneOpen) }}
                 className="btn-secondary text-xs"
               >
                 <Eraser className="w-3.5 h-3.5" />
@@ -125,12 +127,26 @@ export default function TopNav() {
               )}
             </div>
 
-            {/* User / Logout */}
-            <div className="flex items-center gap-2 pl-2 border-l border-base-700/40">
-              <span className="text-xs text-[#5a5a6a] hidden sm:block">{user}</span>
-              <button onClick={() => { logout(); navigate('/login') }} className="btn-ghost text-xs p-1.5" title="Sign out">
-                <LogOut className="w-3.5 h-3.5" />
+            {/* User */}
+            <div className="relative pl-2 border-l border-base-700/40">
+              <button onClick={() => { setPruneOpen(false); setUserOpen(p => !p) }} className="flex items-center gap-1.5 text-xs text-[#5a5a6a] hover:text-[#e4e4ed] transition-colors py-1">
+                <User className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">{user}</span>
               </button>
+              {userOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setUserOpen(false)} />
+                  <div className="absolute right-0 top-full mt-1 z-20 w-44 rounded-lg border border-base-700/60 bg-base-900 shadow-xl animate-fade-in">
+                    <button onClick={() => { setUserOpen(false); navigate('/change-password') }} className="w-full text-left px-3 py-2 text-sm text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all first:rounded-t-lg">
+                      Change Password
+                    </button>
+                    <button onClick={() => { setUserOpen(false); logout(); navigate('/login') }} className="w-full text-left px-3 py-2 text-sm text-red-400 hover:text-red-300 hover:bg-white/[0.04] transition-all last:rounded-b-lg">
+                      <LogOut className="w-3.5 h-3.5 inline -ml-0.5 mr-1.5" />
+                      Sign Out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
