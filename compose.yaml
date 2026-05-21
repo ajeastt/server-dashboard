@@ -9,6 +9,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
       - /opt/stacks:/opt/stacks:rw
       - /opt/server-dashboard/data:/data
+      - /run/dbus/system_bus_socket:/host/run/dbus/system_bus_socket:ro
       - type: bind
         source: /
         target: /host
