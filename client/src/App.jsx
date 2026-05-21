@@ -25,13 +25,13 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/change-password" element={<ProtectedRoute><ChangePassword /></ProtectedRoute>} />
-        <Route path="/smb" element={<ProtectedRoute><Smb /></ProtectedRoute>} />
         <Route element={
           <ProtectedRoute>
             <Layout />
           </ProtectedRoute>
         }>
           <Route path="/" element={<Dashboard />} />
+          <Route path="/smb" element={<Smb />} />
           <Route path="/containers" element={<Containers />} />
           <Route path="/containers/:id" element={<ContainerDetail />} />
           <Route path="/stacks/:name" element={<StackDetail />} />
