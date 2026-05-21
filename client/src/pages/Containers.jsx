@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Download, Check, Play, Square, Loader, ArrowUpDown, Cpu, MemoryStick } from 'lucide-react'
+import { RefreshCw, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Download, Check, Play, Square, Loader, Cpu, MemoryStick } from 'lucide-react'
 import { api } from '../lib/api'
 import StackUpdateModal from '../components/StackUpdateModal'
 import CodeEditor from '../components/CodeEditor'
@@ -9,8 +9,6 @@ export default function Containers() {
   const [containers, setContainers] = useState([])
   const [stacks, setStacks] = useState([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState('')
-  const [filter, setFilter] = useState('all')
   const [expandedStacks, setExpandedStacks] = useState({})
 
   const [showDeploy, setShowDeploy] = useState(false)
@@ -31,8 +29,6 @@ export default function Containers() {
   const [restartedStacks, setRestartedStacks] = useState({})
   const [actingContainers, setActingContainers] = useState({})
   const [stats, setStats] = useState({})
-  const [sortBy, setSortBy] = useState('name')
-  const [showSort, setShowSort] = useState(false)
 
   const summary = useMemo(() => {
     const r = { running: 0, stopped: 0, paused: 0, total: containers.length }
@@ -64,16 +60,6 @@ export default function Containers() {
   const exitCode = (status) => {
     const m = status?.match(/Exited\s*\((\d+)\)/)
     return m ? parseInt(m[1]) : null
-  }
-
-  const sortContainers = (list) => {
-    return [...list].sort((a, b) => {
-      if (sortBy === 'status') {
-        const order = { running: 0, paused: 1, exited: 2, stopped: 3, created: 4 }
-        return (order[a.state] ?? 99) - (order[b.state] ?? 99) || b.created - a.created
-      }
-      return a.name.localeCompare(b.name)
-    })
   }
 
   const fetchAll = useCallback(async () => {
@@ -128,19 +114,13 @@ export default function Containers() {
     }
   }
 
-  const containerPassesFilter = (c) => {
-    if (filter !== 'all' && c.state !== filter) return false
-    if (search && !c.name.toLowerCase().includes(search.toLowerCase()) && !c.image.toLowerCase().includes(search.toLowerCase())) return false
-    return true
-  }
-
   const projectContainers = (containers.filter((c) => c.composeProject).reduce((acc, c) => {
     if (!acc[c.composeProject]) acc[c.composeProject] = []
     acc[c.composeProject].push(c)
     return acc
   }, {}))
 
-  const standalone = containers.filter((c) => !c.composeProject).filter(containerPassesFilter)
+  const standalone = containers.filter((c) => !c.composeProject)
 
   const toggleStack = (name) => setExpandedStacks((prev) => ({ ...prev, [name]: !prev[name] }))
 
@@ -238,36 +218,13 @@ export default function Containers() {
         </span>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5a5a6a]" />
-          <input type="text" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} className="input pl-9" />
-        </div>
-        <div className="flex gap-1">
-          {['all', 'running', 'exited', 'paused'].map((f) => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${filter === f ? 'bg-accent-500/10 text-accent-400' : 'text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04]'}`}>{f}</button>
-          ))}
-        </div>
-        <div className="relative">
-          <button onClick={() => setShowSort(!showSort)} className="btn-secondary gap-1 text-xs"><ArrowUpDown className="w-3 h-3" />{sortBy}</button>
-          {showSort && (
-            <div className="absolute right-0 top-full mt-1 z-20 card py-1 min-w-[120px] shadow-xl border border-base-700/60 bg-base-900" onMouseLeave={() => setShowSort(false)}>
-              {['name', 'status'].map((s) => (
-                <button key={s} onClick={() => { setSortBy(s); setShowSort(false) }} className={`w-full text-left px-3 py-1.5 text-xs transition-all ${sortBy === s ? 'text-accent-400 bg-accent-500/10' : 'text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04]'}`}>{s}</button>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
       {loading ? (
         <div className="flex items-center justify-center h-64 text-sm text-[#8a8a9a]">Loading containers...</div>
       ) : (
         <div className="space-y-2">
           {stacks.map((stack) => {
-            const ctrs = projectContainers[stack.name]?.filter(containerPassesFilter) || []
-            if (ctrs.length === 0 && !search) return null
-            if (search && ctrs.length === 0) return null
+            const ctrs = projectContainers[stack.name] || []
+            if (ctrs.length === 0) return null
             const expanded = expandedStacks[stack.name] !== false
 
             return (
@@ -288,7 +245,7 @@ export default function Containers() {
                     <button onClick={() => handleDestroy(stack.name)} className="btn-ghost p-1.5 hover:text-red-400" title="Destroy"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </button>
-                {expanded && ctrs.length > 0 && sortContainers(ctrs).map((c) => {
+                {expanded && ctrs.length > 0 && ctrs.map((c) => {
                   const s = stats[c.id]
                   const ec = exitCode(c.status)
                   return (
@@ -338,7 +295,7 @@ export default function Containers() {
                 <span className="text-sm font-medium text-[#8a8a9a]">Standalone</span>
                 <span className="text-xs text-[#5a5a6a]">{standalone.length}</span>
               </div>
-              {sortContainers(standalone).map((c) => {
+              {standalone.map((c) => {
                 const s = stats[c.id]
                 const ec = exitCode(c.status)
                 return (
@@ -380,7 +337,7 @@ export default function Containers() {
             </div>
           )}
 
-          {!search && stacks.length === 0 && standalone.length === 0 && (
+          {stacks.length === 0 && standalone.length === 0 && (
             <div className="flex flex-col items-center justify-center h-64 gap-3">
               <Box className="w-10 h-10 text-[#5a5a6a]" />
               <p className="text-sm text-[#8a8a9a]">No containers found.</p>
