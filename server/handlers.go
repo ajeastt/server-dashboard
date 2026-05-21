@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net"
 	"os"
@@ -503,6 +504,10 @@ func handleImagePullStream(c *fiber.Ctx) error {
 
 // ── Stack update stream (SSE) ──
 
+func stripANSI(s string) string {
+	return ansiRegex.ReplaceAllString(s, "")
+}
+
 func handleStackUpdateStream(c *fiber.Ctx) error {
 	name := c.Params("name")
 	sse, err := newSSE(c)
@@ -516,45 +521,66 @@ func handleStackUpdateStream(c *fiber.Ctx) error {
 		return nil
 	}
 
-	streamCmd := func(args []string) (bool, error) {
+	pullLog := []string{}
+	streamCmd := func(args []string) error {
 		cmd := exec.Command("docker", append([]string{"compose", "-p", name}, args...)...)
 		cmd.Dir = dir
 		stdout, _ := cmd.StdoutPipe()
 		stderr, _ := cmd.StderrPipe()
 		if err := cmd.Start(); err != nil {
-			return false, err
+			return err
 		}
-
 		reader := io.MultiReader(stdout, stderr)
 		scanner := bufio.NewScanner(reader)
-		pulled := false
 		for scanner.Scan() {
-			line := scanner.Text()
-			if strings.Contains(line, "Downloaded newer image") {
-				pulled = true
+			clean := stripANSI(scanner.Text())
+			if clean == "" {
+				continue
 			}
-			if err := sse.Event("", fiber.Map{"stream": line + "\n"}); err != nil {
+			pullLog = append(pullLog, clean)
+			if err := sse.Event("", fiber.Map{"stream": clean + "\n"}); err != nil {
 				cmd.Process.Kill()
-				return pulled, err
+				return err
 			}
 		}
-		return pulled, cmd.Wait()
+		return cmd.Wait()
 	}
 
-	pulled, err := streamCmd([]string{"pull"})
-	if err != nil {
-		sse.Error(err.Error())
+	sse.Event("phase", fiber.Map{"phase": "pull"})
+	if err := streamCmd([]string{"pull"}); err != nil {
+		sse.Error(fmt.Sprintf("Pull failed: %s", err.Error()))
 		return nil
 	}
+
+	// Detect if any image was actually pulled by parsing output.
+	pulled := false
+	for _, line := range pullLog {
+		lower := strings.ToLower(line)
+		if strings.Contains(lower, "pulled") && !strings.Contains(lower, "skipped") {
+			pulled = true
+			break
+		}
+	}
+	if !pulled {
+		// Fallback: check if "Downloaded" appears (docker CLI format)
+		for _, line := range pullLog {
+			if strings.Contains(strings.ToLower(line), "downloaded") {
+				pulled = true
+				break
+			}
+		}
+	}
+
 	if !pulled {
 		sse.Event("no-update", fiber.Map{})
 		sse.Done()
 		return nil
 	}
+
 	sse.Event("phase", fiber.Map{"phase": "up"})
-	_, err = streamCmd([]string{"up", "-d"})
-	if err != nil {
-		sse.Error(err.Error())
+	pullLog = nil
+	if err := streamCmd([]string{"up", "-d"}); err != nil {
+		sse.Error(fmt.Sprintf("Restart failed: %s", err.Error()))
 		return nil
 	}
 	sse.Done()
