@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Link } from 'react-router-dom'
-import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Download, Check, Play, Square, Loader } from 'lucide-react'
+import { RefreshCw, Search, ChevronDown, ChevronRight, Layers, Box, Plus, Edit3, Trash2, Terminal, X, Download, Check, Play, Square, Loader, ArrowUpDown, Cpu, MemoryStick } from 'lucide-react'
 import { api } from '../lib/api'
 import StackUpdateModal from '../components/StackUpdateModal'
 import CodeEditor from '../components/CodeEditor'
@@ -30,15 +30,62 @@ export default function Containers() {
   const [restartingStacks, setRestartingStacks] = useState({})
   const [restartedStacks, setRestartedStacks] = useState({})
   const [actingContainers, setActingContainers] = useState({})
+  const [stats, setStats] = useState({})
+  const [sortBy, setSortBy] = useState('name')
+  const [showSort, setShowSort] = useState(false)
+
+  const summary = useMemo(() => {
+    const r = { running: 0, stopped: 0, paused: 0, total: containers.length }
+    containers.forEach((c) => {
+      if (c.state === 'running') r.running++
+      else if (c.state === 'exited' || c.state === 'stopped') r.stopped++
+      else if (c.state === 'paused') r.paused++
+    })
+    return r
+  }, [containers])
+
+  const relativeTime = (ts) => {
+    const diff = Math.floor((Date.now() - ts * 1000) / 1000)
+    if (diff < 60) return 'just now'
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
+    if (diff < 2592000) return `${Math.floor(diff / 86400)}d ago`
+    return `${Math.floor(diff / 2592000)}mo ago`
+  }
+
+  const formatBytes = (bytes) => {
+    if (!bytes) return ''
+    if (bytes < 1024) return `${bytes}B`
+    if (bytes < 1048576) return `${(bytes / 1024).toFixed(0)}KB`
+    if (bytes < 1073741824) return `${(bytes / 1048576).toFixed(0)}MB`
+    return `${(bytes / 1073741824).toFixed(1)}GB`
+  }
+
+  const exitCode = (status) => {
+    const m = status?.match(/Exited\s*\((\d+)\)/)
+    return m ? parseInt(m[1]) : null
+  }
+
+  const sortContainers = (list) => {
+    return [...list].sort((a, b) => {
+      if (sortBy === 'status') {
+        const order = { running: 0, paused: 1, exited: 2, stopped: 3, created: 4 }
+        return (order[a.state] ?? 99) - (order[b.state] ?? 99) || b.created - a.created
+      }
+      return a.name.localeCompare(b.name)
+    })
+  }
 
   const fetchAll = useCallback(async () => {
     try {
-      const [ctrs, stks] = await Promise.all([
+      const [ctrs, stks, allStats] = await Promise.all([
         api.docker.containers(),
         api.docker.stacks(),
+        api.docker.allStats().catch(() => ({})),
       ])
       setContainers(ctrs)
       setStacks(stks)
+      setStats(allStats || {})
     } catch (err) {
       console.error('Failed to fetch:', err)
     } finally {
@@ -182,6 +229,15 @@ export default function Containers() {
         </div>
       </div>
 
+      <div className="flex items-center gap-3 px-4 py-2 card">
+        <span className="text-xs text-[#8a8a9a]">
+          <span className="text-emerald-400 font-medium">{summary.running}</span> running
+          {summary.stopped > 0 && <>, <span className="text-red-400 font-medium">{summary.stopped}</span> stopped</>}
+          {summary.paused > 0 && <>, <span className="text-amber-400 font-medium">{summary.paused}</span> paused</>}
+          <span className="text-[#5a5a6a] ml-1">· {summary.total} total</span>
+        </span>
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-3">
         <div className="relative flex-1">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#5a5a6a]" />
@@ -191,6 +247,16 @@ export default function Containers() {
           {['all', 'running', 'exited', 'paused'].map((f) => (
             <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all ${filter === f ? 'bg-accent-500/10 text-accent-400' : 'text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04]'}`}>{f}</button>
           ))}
+        </div>
+        <div className="relative">
+          <button onClick={() => setShowSort(!showSort)} className="btn-secondary gap-1 text-xs"><ArrowUpDown className="w-3 h-3" />{sortBy}</button>
+          {showSort && (
+            <div className="absolute right-0 top-full mt-1 z-20 card py-1 min-w-[120px] shadow-xl border border-base-700/60 bg-base-900" onMouseLeave={() => setShowSort(false)}>
+              {['name', 'status'].map((s) => (
+                <button key={s} onClick={() => { setSortBy(s); setShowSort(false) }} className={`w-full text-left px-3 py-1.5 text-xs transition-all ${sortBy === s ? 'text-accent-400 bg-accent-500/10' : 'text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04]'}`}>{s}</button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -222,7 +288,10 @@ export default function Containers() {
                     <button onClick={() => handleDestroy(stack.name)} className="btn-ghost p-1.5 hover:text-red-400" title="Destroy"><Trash2 className="w-3.5 h-3.5" /></button>
                   </div>
                 </button>
-                {expanded && ctrs.length > 0 && ctrs.map((c) => (
+                {expanded && ctrs.length > 0 && sortContainers(ctrs).map((c) => {
+                  const s = stats[c.id]
+                  const ec = exitCode(c.status)
+                  return (
                   <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/30 hover:bg-white/[0.02] transition-all ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
                     {statusDot(c.state)}
                     <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
@@ -233,7 +302,15 @@ export default function Containers() {
                       </div>
                     </Link>
                     <div className="flex items-center gap-1 hidden lg:flex">{formatPorts(c.ports)}</div>
-                    <span className="text-xs text-[#5a5a6a] whitespace-nowrap">{c.state === 'running' ? c.status : ''}</span>
+                    {c.state === 'running' && s ? (
+                      <div className="flex items-center gap-2 text-[10px] text-[#5a5a6a] font-mono whitespace-nowrap">
+                        <span className="flex items-center gap-0.5"><Cpu className="w-2.5 h-2.5" />{s.cpuPercent.toFixed(1)}%</span>
+                        <span className="flex items-center gap-0.5"><MemoryStick className="w-2.5 h-2.5" />{formatBytes(s.memUsage)}</span>
+                      </div>
+                    ) : ec !== null ? (
+                      <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${ec === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>exit {ec}</span>
+                    ) : null}
+                    <span className="text-[10px] text-[#5a5a6a] font-mono whitespace-nowrap">{relativeTime(c.created)}</span>
                     <div className="flex items-center gap-0.5">
                       {c.state === 'running' ? (
                         <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1 rounded text-[#5a5a6a] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
@@ -248,7 +325,8 @@ export default function Containers() {
                       <Link to={`/containers/${c.id}`} className="p-1 rounded text-[#5a5a6a] hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Logs"><Terminal className="w-3.5 h-3.5" /></Link>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             )
           })}
@@ -260,7 +338,10 @@ export default function Containers() {
                 <span className="text-sm font-medium text-[#8a8a9a]">Standalone</span>
                 <span className="text-xs text-[#5a5a6a]">{standalone.length}</span>
               </div>
-              {standalone.map((c) => (
+              {sortContainers(standalone).map((c) => {
+                const s = stats[c.id]
+                const ec = exitCode(c.status)
+                return (
                 <div key={c.id} className={`flex items-center gap-3 px-4 py-2 border-t border-base-700/20 hover:bg-white/[0.02] transition-all ${actingContainers[c.id] ? 'container-row-glow' : ''}`}>
                   {statusDot(c.state)}
                   <Link to={`/containers/${c.id}`} className="flex-1 min-w-0">
@@ -271,7 +352,15 @@ export default function Containers() {
                     </div>
                   </Link>
                   <div className="flex items-center gap-1 hidden lg:flex">{formatPorts(c.ports)}</div>
-                  <span className="text-xs text-[#5a5a6a] whitespace-nowrap">{c.state === 'running' ? c.status : ''}</span>
+                  {c.state === 'running' && s ? (
+                    <div className="flex items-center gap-2 text-[10px] text-[#5a5a6a] font-mono whitespace-nowrap">
+                      <span className="flex items-center gap-0.5"><Cpu className="w-2.5 h-2.5" />{s.cpuPercent.toFixed(1)}%</span>
+                      <span className="flex items-center gap-0.5"><MemoryStick className="w-2.5 h-2.5" />{formatBytes(s.memUsage)}</span>
+                    </div>
+                  ) : ec !== null ? (
+                    <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded ${ec === 0 ? 'bg-emerald-500/10 text-emerald-400' : 'bg-red-500/10 text-red-400'}`}>exit {ec}</span>
+                  ) : null}
+                  <span className="text-[10px] text-[#5a5a6a] font-mono whitespace-nowrap">{relativeTime(c.created)}</span>
                   <div className="flex items-center gap-0.5">
                     {c.state === 'running' ? (
                       <button onClick={() => handleAction(c.id, 'stop')} disabled={actingContainers[c.id]} className="p-1 rounded text-[#5a5a6a] hover:text-red-400 hover:bg-red-500/10 transition-all disabled:opacity-50" title="Stop">
@@ -286,7 +375,8 @@ export default function Containers() {
                     <Link to={`/containers/${c.id}`} className="p-1 rounded text-[#5a5a6a] hover:text-accent-400 hover:bg-accent-500/10 transition-all" title="Logs"><Terminal className="w-3.5 h-3.5" /></Link>
                   </div>
                 </div>
-              ))}
+                )
+              })}
             </div>
           )}
 

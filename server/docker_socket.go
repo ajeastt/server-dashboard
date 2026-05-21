@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -424,6 +425,34 @@ func getDockerEvents() ([]map[string]interface{}, error) {
 func containerAction(id, action string) error {
 	_, err := dockerPost("/containers/"+id+"/"+action, nil)
 	return err
+}
+
+func getAllContainerStats() map[string]*StatsResp {
+	ctrs, err := listContainers()
+	if err != nil {
+		return nil
+	}
+	result := make(map[string]*StatsResp)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+	for _, c := range ctrs {
+		if c.State != "running" {
+			continue
+		}
+		wg.Add(1)
+		go func(id string) {
+			defer wg.Done()
+			stats, err := getContainerStats(id)
+			if err != nil {
+				return
+			}
+			mu.Lock()
+			result[id] = stats
+			mu.Unlock()
+		}(c.ID)
+	}
+	wg.Wait()
+	return result
 }
 
 // ── Image operations ──

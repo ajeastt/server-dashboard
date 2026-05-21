@@ -44,6 +44,7 @@ func main() {
 	// ── Docker ──
 	d := app.Group("/api/docker")
 	d.Get("/containers", handleListContainers)
+	d.Get("/containers/stats", handleAllContainerStats)
 	d.Get("/containers/:id", handleGetContainer)
 	d.Get("/containers/:id/stats", handleContainerStats)
 	d.Get("/containers/:id/logs", handleContainerLogs)

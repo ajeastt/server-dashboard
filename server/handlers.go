@@ -72,6 +72,11 @@ func handleGetContainer(c *fiber.Ctx) error {
 	return c.JSON(info)
 }
 
+func handleAllContainerStats(c *fiber.Ctx) error {
+	stats := getAllContainerStats()
+	return c.JSON(stats)
+}
+
 func handleContainerStats(c *fiber.Ctx) error {
 	stats, err := getContainerStats(c.Params("id"))
 	if err != nil {

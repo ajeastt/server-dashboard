@@ -20,6 +20,7 @@ export const api = {
   },
   docker: {
     containers: () => fetchJson('/docker/containers'),
+    allStats: () => fetchJson('/docker/containers/stats'),
     container: (id) => fetchJson(`/docker/containers/${id}`),
     stats: (id) => fetchJson(`/docker/containers/${id}/stats`),
     logs: (id, tail = 100) => fetchJson(`/docker/containers/${id}/logs?tail=${tail}`),
