@@ -245,7 +245,10 @@ func CreateRaidArray(name, level string, devices []string) error {
 		return fmt.Errorf("mdadm install failed: %w", err)
 	}
 
-	devicePath := fmt.Sprintf("/dev/md/%s", name)
+	// Sanitize md device name — strip leading slash, replace remaining slashes with dash
+	mdName := strings.TrimLeft(name, "/")
+	mdName = strings.ReplaceAll(mdName, "/", "-")
+	devicePath := fmt.Sprintf("/dev/md/%s", mdName)
 
 	// Unmount any existing partitions on the selected disks and wipe them
 	for _, d := range devices {
@@ -273,20 +276,20 @@ func CreateRaidArray(name, level string, devices []string) error {
 	hostRun("udevadm", "settle")
 
 	// Format the array
-	if _, err := hostRun("mkfs.ext4", "-F", "-L", name, devicePath); err != nil {
+	if _, err := hostRun("mkfs.ext4", "-F", "-L", mdName, devicePath); err != nil {
 		hostRun("mdadm", "--stop", devicePath)
 		return fmt.Errorf("mkfs raid: %w", err)
 	}
 
 	// Get UUID
-	partName := fmt.Sprintf("md/%s", name)
+	partName := fmt.Sprintf("md/%s", mdName)
 	uuid, err := getUUID(partName)
 	if err != nil {
 		hostRun("mdadm", "--stop", devicePath)
 		return fmt.Errorf("get uuid: %w", err)
 	}
 
-	// Mount
+	// Mount at the user-specified path
 	mp := mountPath(name)
 	hostRun("mkdir", "-p", mp)
 	if _, err := hostRun("mount", "UUID="+uuid, mp); err != nil {
@@ -294,7 +297,7 @@ func CreateRaidArray(name, level string, devices []string) error {
 		return fmt.Errorf("mount raid: %w", err)
 	}
 
-	addToFstab(uuid, mp, name)
+	addToFstab(uuid, mp, mdName)
 
 	return nil
 }
