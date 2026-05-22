@@ -49,6 +49,9 @@ func getUUID(part string) (string, error) {
 }
 
 func mountPath(name string) string {
+	if strings.HasPrefix(name, "/") {
+		return name
+	}
 	return filepath.Join(mountBase, name)
 }
 
