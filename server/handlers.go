@@ -288,6 +288,9 @@ func handleCreatePool(c *fiber.Ctx) error {
 	if err := c.BodyParser(&body); err != nil {
 		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
 	}
+	if err := EnsureMergerFSInstalled(); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": fmt.Sprintf("mergerfs install failed: %s", err.Error())})
+	}
 	if err := CreateMergerFSPool(body.Name, body.MountPoints); err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
 	}

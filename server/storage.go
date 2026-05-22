@@ -34,21 +34,18 @@ type PoolInfo struct {
 	Free       uint64   `json:"free"`
 }
 
-func runCmd(name string, args ...string) (string, error) {
-	cmd := exec.Command(name, args...)
+func hostRun(args ...string) (string, error) {
+	cmd := exec.Command("chroot", append([]string{"/host"}, args...)...)
 	out, err := cmd.CombinedOutput()
-	if err != nil {
-		return string(out), fmt.Errorf("%s: %w\n%s", name, err, string(out))
-	}
-	return string(out), nil
+	return strings.TrimSpace(string(out)), err
 }
 
 func getUUID(part string) (string, error) {
-	out, err := exec.Command("blkid", "-s", "UUID", "-o", "value", "/dev/"+part).Output()
+	out, err := hostRun("blkid", "-s", "UUID", "-o", "value", "/dev/"+part)
 	if err != nil {
 		return "", fmt.Errorf("blkid: %w", err)
 	}
-	return strings.TrimSpace(string(out)), nil
+	return strings.TrimSpace(out), nil
 }
 
 func mountPath(name string) string {
@@ -60,28 +57,28 @@ func formatDevice(diskName, label string) (*FormatResult, error) {
 	disk := "/dev/" + diskName
 	children := getPartitions(diskName)
 
-	// Step 1: unmount any mounted partitions
+	// Step 1: unmount any mounted partitions on the host
 	for _, part := range children {
 		if part.Mountpoint != "" {
-			exec.Command("umount", "/dev/"+part.Name).Run()
+			hostRun("umount", "/dev/"+part.Name)
 		}
 	}
 
 	// Step 2: wipe the disk
-	runCmd("wipefs", "-a", disk)
+	hostRun("wipefs", "-a", disk)
 
 	// Step 3: create GPT partition table
-	runCmd("parted", "-s", disk, "mklabel", "gpt")
+	hostRun("parted", "-s", disk, "mklabel", "gpt")
 
 	// Step 4: create single ext4 partition
-	runCmd("parted", "-s", disk, "mkpart", "primary", "ext4", "0%", "100%")
+	hostRun("parted", "-s", disk, "mkpart", "primary", "ext4", "0%", "100%")
 
 	// Step 5: wait for partition to appear
 	partName := diskName + "1"
-	runCmd("partprobe", disk)
+	hostRun("partprobe", disk)
 
 	// Step 6: create filesystem
-	runCmd("mkfs.ext4", "-F", "-L", label, "/dev/"+partName)
+	hostRun("mkfs.ext4", "-F", "-L", label, "/dev/"+partName)
 
 	// Step 7: get UUID
 	uuid, err := getUUID(partName)
@@ -89,15 +86,15 @@ func formatDevice(diskName, label string) (*FormatResult, error) {
 		return nil, fmt.Errorf("get uuid: %w", err)
 	}
 
-	// Step 8: create mount point and mount
+	// Step 8: create mount point and mount on host
 	mp := mountPath(label)
-	os.MkdirAll(mp, 0755)
-	_, err = runCmd("mount", "UUID="+uuid, mp)
+	hostRun("mkdir", "-p", mp)
+	_, err = hostRun("mount", "UUID="+uuid, mp)
 	if err != nil {
 		return nil, fmt.Errorf("mount: %w", err)
 	}
 
-	// Step 9: add to fstab with nofail
+	// Step 9: add to host fstab with nofail
 	addToFstab(uuid, mp, label)
 
 	return &FormatResult{
@@ -114,13 +111,12 @@ type PartitionInfo struct {
 }
 
 func getPartitions(diskName string) []PartitionInfo {
-	cmd := exec.Command("lsblk", "-J", "-o", "NAME,TYPE,MOUNTPOINT")
-	out, err := cmd.Output()
+	out, err := hostRun("lsblk", "-J", "-o", "NAME,TYPE,MOUNTPOINT")
 	if err != nil {
 		return nil
 	}
 	var resp BlockDevicesResp
-	if err := json.Unmarshal(out, &resp); err != nil {
+	if err := json.Unmarshal([]byte(out), &resp); err != nil {
 		return nil
 	}
 	for _, d := range resp.BlockDevices {
@@ -137,7 +133,7 @@ func getPartitions(diskName string) []PartitionInfo {
 
 func addToFstab(uuid, mountPath, label string) {
 	entry := fmt.Sprintf("UUID=%s %s ext4 defaults,nofail 0 2\n", uuid, mountPath)
-	f, err := os.OpenFile("/etc/fstab", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	f, err := os.OpenFile("/host/etc/fstab", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return
 	}
@@ -146,7 +142,7 @@ func addToFstab(uuid, mountPath, label string) {
 }
 
 func removeFromFstab(mountPath string) {
-	data, err := os.ReadFile("/etc/fstab")
+	data, err := os.ReadFile("/host/etc/fstab")
 	if err != nil {
 		return
 	}
@@ -158,19 +154,19 @@ func removeFromFstab(mountPath string) {
 		}
 		filtered = append(filtered, line)
 	}
-	os.WriteFile("/etc/fstab", []byte(strings.Join(filtered, "\n")), 0644)
+	os.WriteFile("/host/etc/fstab", []byte(strings.Join(filtered, "\n")), 0644)
 }
 
-// UnmountDevice unmounts and optionally removes the mount point and fstab entry
+// UnmountDevice unmounts and removes the mount point and fstab entry on the host
 func unmountDevice(mountPath string) error {
-	runCmd("umount", mountPath)
+	hostRun("umount", mountPath)
 	removeFromFstab(mountPath)
 	return nil
 }
 
-// ExistingMounts lists all CasaOS-managed mounts (by scanning our mount base)
+// ExistingMounts lists all CasaOS-managed mounts (by scanning our mount base on the host)
 func ListManagedMounts() ([]FormatResult, error) {
-	entries, err := os.ReadDir(mountBase)
+	entries, err := os.ReadDir("/host" + mountBase)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return []FormatResult{}, nil
@@ -183,8 +179,7 @@ func ListManagedMounts() ([]FormatResult, error) {
 			continue
 		}
 		mp := filepath.Join(mountBase, e.Name())
-		// get UUID from mountinfo
-		cmd := exec.Command("findmnt", "-n", "-o", "UUID,SOURCE", "--target", mp)
+		cmd := exec.Command("chroot", "/host", "findmnt", "-n", "-o", "UUID,SOURCE", "--target", mp)
 		out, err := cmd.Output()
 		if err != nil {
 			continue
@@ -209,20 +204,20 @@ func ListManagedMounts() ([]FormatResult, error) {
 
 // CreateMergerFSPool creates a mergerfs pool from multiple mount points
 func CreateMergerFSPool(name string, mountPoints []string) error {
-	mp := filepath.Join(mountBase, name)
-	os.MkdirAll(mp, 0755)
+	mp := mountPath(name)
+	hostRun("mkdir", "-p", mp)
 
 	srcs := strings.Join(mountPoints, ":")
 	opts := "defaults,allow_other,use_ino,category.create=mfs,nofail"
 
-	_, err := runCmd("mergerfs", "-o", opts, srcs, mp)
+	_, err := hostRun("mergerfs", "-o", opts, srcs, mp)
 	if err != nil {
 		return fmt.Errorf("mergerfs mount: %w", err)
 	}
 
 	// Add to fstab
 	entry := fmt.Sprintf("%s %s fuse.mergerfs %s 0 0\n", srcs, mp, opts)
-	f, err := os.OpenFile("/etc/fstab", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
+	f, err := os.OpenFile("/host/etc/fstab", os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return err
 	}
@@ -234,9 +229,19 @@ func CreateMergerFSPool(name string, mountPoints []string) error {
 
 // DestroyMergerFSPool unmounts and removes the pool
 func DestroyMergerFSPool(name string) error {
-	mp := filepath.Join(mountBase, name)
-	runCmd("umount", mp)
+	mp := mountPath(name)
+	hostRun("umount", mp)
 	removeFromFstab(mp)
-	os.RemoveAll(mp)
+	hostRun("rm", "-rf", mp)
 	return nil
+}
+
+// EnsureMergerFSInstalled checks and installs mergerfs on the host
+func EnsureMergerFSInstalled() error {
+	_, err := hostRun("which", "mergerfs")
+	if err == nil {
+		return nil
+	}
+	_, err = hostRun("dnf", "install", "-y", "mergerfs")
+	return err
 }
