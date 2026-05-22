@@ -280,6 +280,32 @@ func handleUnmountDevice(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+func handleDestroyVolume(c *fiber.Ctx) error {
+	var body struct {
+		MountPoint string `json:"mountPoint"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	// Get source device before unmounting
+	out, _ := hostRun("findmnt", "-n", "-o", "SOURCE", "--target", body.MountPoint)
+	source := strings.TrimSpace(out)
+
+	// Unmount and remove fstab
+	hostRun("umount", body.MountPoint)
+	removeFromFstab(body.MountPoint)
+
+	// If it's an md device, stop the RAID array
+	if strings.HasPrefix(source, "/dev/md") {
+		hostRun("mdadm", "--stop", source)
+	}
+
+	// Remove mount point directory
+	os.RemoveAll("/host" + body.MountPoint)
+
+	return c.JSON(fiber.Map{"success": true})
+}
+
 func handleCreateRaid(c *fiber.Ctx) error {
 	var body struct {
 		Name    string   `json:"name"`

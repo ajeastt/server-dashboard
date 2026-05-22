@@ -75,6 +75,8 @@ export const api = {
       fetchJson('/storage/format', { method: 'POST', body: JSON.stringify({ device, label }) }),
     unmount: (mountPoint) =>
       fetchJson('/storage/unmount', { method: 'POST', body: JSON.stringify({ mountPoint }) }),
+    destroyVolume: (mountPoint) =>
+      fetchJson('/storage/destroy', { method: 'POST', body: JSON.stringify({ mountPoint }) }),
     createPool: (name, mountPoints) =>
       fetchJson('/storage/pool', { method: 'POST', body: JSON.stringify({ name, mountPoints }) }),
     destroyPool: (name) =>

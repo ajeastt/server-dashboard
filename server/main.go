@@ -86,6 +86,7 @@ func main() {
 	st.Get("/mounts", handleListMounts)
 	st.Post("/format", handleFormatDisk)
 	st.Post("/unmount", handleUnmountDevice)
+	st.Post("/destroy", handleDestroyVolume)
 	st.Post("/pool", handleCreatePool)
 	st.Delete("/pool/:name", handleDestroyPool)
 	st.Post("/raid", handleCreateRaid)

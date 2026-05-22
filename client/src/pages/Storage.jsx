@@ -86,6 +86,17 @@ export default function Storage() {
     }
   }
 
+  const handleDestroy = async (mount) => {
+    if (!window.confirm(`Destroy ${mount.mountPoint}? This will unmount and tear down the RAID/pool.`)) return
+    setError('')
+    try {
+      await api.storage.destroyVolume(mount.mountPoint)
+      loadData()
+    } catch (e) {
+      setError(e.message)
+    }
+  }
+
   const handleCreate = async () => {
     if (!poolName.trim() || selectedCount < 2) return
     setCreating(true)
@@ -212,8 +223,11 @@ export default function Storage() {
                         >
                           <Check className="w-3.5 h-3.5" />
                         </button>
-                        <button onClick={() => handleUnmount(m)} className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-red-400" title="Unmount">
+                        <button onClick={() => handleUnmount(m)} className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-amber-400" title="Unmount">
                           <Unlink className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleDestroy(m)} className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-red-400" title="Destroy pool/raid">
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
