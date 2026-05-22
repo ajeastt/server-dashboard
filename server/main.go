@@ -88,6 +88,7 @@ func main() {
 	st.Post("/unmount", handleUnmountDevice)
 	st.Post("/pool", handleCreatePool)
 	st.Delete("/pool/:name", handleDestroyPool)
+	st.Post("/raid", handleCreateRaid)
 
 	// ── SMB ──
 	smb := app.Group("/api/smb")

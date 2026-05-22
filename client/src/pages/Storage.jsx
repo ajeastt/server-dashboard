@@ -23,14 +23,23 @@ function DiskTypeLabel({ disk }) {
   return <span className="bg-sky-500/10 text-sky-400 px-1.5 py-0.5 rounded text-[10px] font-medium">Internal</span>
 }
 
+const RAID_LEVELS = [
+  { value: '', label: 'MergerFS (JBOD union)', min: 2 },
+  { value: '0', label: 'RAID 0 (stripe)', min: 2 },
+  { value: '1', label: 'RAID 1 (mirror)', min: 2 },
+  { value: '5', label: 'RAID 5 (stripe+parity)', min: 3 },
+  { value: '10', label: 'RAID 10 (mirror+stripe)', min: 4 },
+]
+
 export default function Storage() {
   const [disks, setDisks] = useState([])
   const [mounts, setMounts] = useState([])
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState({})
   const [formatting, setFormatting] = useState(null)
-  const [creatingPool, setCreatingPool] = useState(false)
+  const [creating, setCreating] = useState(false)
   const [poolName, setPoolName] = useState('')
+  const [raidLevel, setRaidLevel] = useState('')
   const [error, setError] = useState('')
 
   const loadData = () => {
@@ -50,6 +59,9 @@ export default function Storage() {
 
   const anySelected = Object.values(selected).some(Boolean)
   const selectedCount = Object.values(selected).filter(Boolean).length
+  const validLevels = RAID_LEVELS.filter((l) => !l.min || selectedCount >= l.min)
+  const validRaid = raidLevel === '' || validLevels.some((l) => l.value === raidLevel)
+  if (!validRaid) setRaidLevel('')
 
   const handleFormat = async (disk) => {
     setFormatting(disk.name)
@@ -74,39 +86,42 @@ export default function Storage() {
     }
   }
 
-  const handleCreatePool = async () => {
+  const handleCreate = async () => {
     if (!poolName.trim() || selectedCount < 2) return
-    setCreatingPool(true)
+    setCreating(true)
     setError('')
     try {
-      const selectedMounts = Object.keys(selected).filter((k) => selected[k])
-      const mountPoints = selectedMounts
-        .map((n) => disks.find((d) => d.name === n))
-        .filter(Boolean)
-        .map((d) => {
-          const m = mounts.find((m) => m.device === d.name)
-          return m ? m.mountPoint : null
-        })
-        .filter(Boolean)
-      if (mountPoints.length < 2) {
-        setError('Select at least 2 formatted disks to create a pool.')
-        return
+      const selectedNames = Object.keys(selected).filter((k) => selected[k])
+      if (raidLevel === '') {
+        const mountPoints = selectedNames
+          .map((n) => {
+            const m = mounts.find((m) => m.device === n || m.partition === `${n}1`)
+            return m ? m.mountPoint : null
+          })
+          .filter(Boolean)
+        if (mountPoints.length < 2) {
+          setError('Select at least 2 formatted drives.')
+          return
+        }
+        await api.storage.createPool(poolName.trim(), mountPoints)
+      } else {
+        await api.storage.createRaid(poolName.trim(), raidLevel, selectedNames)
       }
-      await api.storage.createPool(poolName.trim(), mountPoints)
       setPoolName('')
+      setRaidLevel('')
       setSelected({})
       loadData()
     } catch (e) {
       setError(e.message)
     } finally {
-      setCreatingPool(false)
+      setCreating(false)
     }
   }
 
-  // Group disks: formatted ones (have a mount) vs raw ones
+  const isRaid = raidLevel !== ''
+
   const formattedDiskNames = new Set(mounts.map((m) => m.device))
   const rawDisks = disks.filter((d) => !formattedDiskNames.has(d.name))
-  const formattedDisks = disks.filter((d) => formattedDiskNames.has(d.name))
 
   return (
     <div className="space-y-6 animate-fade-in">
@@ -123,12 +138,23 @@ export default function Storage() {
                 type="text"
                 value={poolName}
                 onChange={(e) => setPoolName(e.target.value)}
-                placeholder="Pool name..."
-                className="input w-40 text-xs"
+                placeholder="Name..."
+                className="input w-32 text-xs"
               />
-              <button onClick={handleCreatePool} disabled={creatingPool || !poolName.trim()} className="btn-primary">
-                {creatingPool ? <Loader2 className="w-4 h-4 animate-spin" /> : <Layers className="w-4 h-4" />}
-                Create Pool
+              <select
+                value={raidLevel}
+                onChange={(e) => setRaidLevel(e.target.value)}
+                className="input text-xs w-42"
+              >
+                {RAID_LEVELS.map((l) => (
+                  <option key={l.value} value={l.value} disabled={selectedCount < (l.min || 2)}>
+                    {l.label} {selectedCount < (l.min || 2) ? `(needs ${l.min})` : ''}
+                  </option>
+                ))}
+              </select>
+              <button onClick={handleCreate} disabled={creating || !poolName.trim()} className="btn-primary">
+                {creating ? <Loader2 className="w-4 h-4 animate-spin" /> : (isRaid ? <Plus className="w-4 h-4" /> : <Layers className="w-4 h-4" />)}
+                {isRaid ? 'Create RAID' : 'Create Pool'}
               </button>
             </div>
           )}
@@ -149,18 +175,26 @@ export default function Storage() {
         <div className="flex items-center justify-center h-48 text-sm text-[#8a8a9a]">Scanning disks...</div>
       ) : (
         <>
-          {/* Managed volumes / pools */}
+          {/* Mounted Volumes — with select checkmarks */}
           {mounts.length > 0 && (
             <div>
-              <h2 className="text-xs font-semibold text-[#5a5a6a] uppercase tracking-wider mb-3">Mounted Volumes</h2>
+              <h2 className="text-xs font-semibold text-[#5a5a6a] uppercase tracking-wider mb-3">
+                Mounted Volumes
+                {selectedCount > 0 && <span className="text-accent-400 ml-1.5">· {selectedCount} selected</span>}
+              </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
                 {mounts.map((m) => {
-                  const disk = disks.find((d) => d.device === m.device || d.name === m.device)
+                  const isSel = !!selected[m.device]
                   return (
-                    <div key={m.mountPoint} className="card p-3 flex items-center justify-between">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="p-1.5 rounded-lg bg-emerald-500/10">
-                          <HardDrive className="w-4 h-4 text-emerald-400" />
+                    <div
+                      key={m.mountPoint}
+                      className={`card p-3 flex items-center justify-between transition-all duration-200 ${
+                        isSel ? 'ring-2 ring-accent-500 shadow-lg shadow-accent-500/10' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className={`p-1.5 rounded-lg ${isSel ? 'bg-accent-500/20' : 'bg-emerald-500/10'} transition-all`}>
+                          <HardDrive className={`w-4 h-4 ${isSel ? 'text-accent-400' : 'text-emerald-400'}`} />
                         </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
@@ -170,9 +204,18 @@ export default function Storage() {
                           <div className="text-[11px] text-[#8a8a9a] truncate mt-0.5">{m.mountPoint}</div>
                         </div>
                       </div>
-                      <button onClick={() => handleUnmount(m)} className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-red-400 shrink-0">
-                        <Unlink className="w-3.5 h-3.5" />
-                      </button>
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          onClick={() => toggleDisk(m.device)}
+                          className={`btn-ghost p-1.5 ${isSel ? 'text-accent-400' : 'text-[#5a5a6a]'}`}
+                          title="Select for pool/raid"
+                        >
+                          <Check className="w-3.5 h-3.5" />
+                        </button>
+                        <button onClick={() => handleUnmount(m)} className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-red-400" title="Unmount">
+                          <Unlink className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
                     </div>
                   )
                 })}
@@ -180,31 +223,17 @@ export default function Storage() {
             </div>
           )}
 
-          {/* Raw disks */}
+          {/* Raw disks — format only, no select */}
           <div>
-            <h2 className="text-xs font-semibold text-[#5a5a6a] uppercase tracking-wider mb-3">
-              Available Disks
-              {selectedCount > 0 && <span className="text-accent-400 ml-1.5">· {selectedCount} selected</span>}
-            </h2>
+            <h2 className="text-xs font-semibold text-[#5a5a6a] uppercase tracking-wider mb-3">Available Disks</h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
               {rawDisks.map((disk) => {
-                const isSel = !!selected[disk.name]
                 const hasParts = disk.children && disk.children.length > 0
-                const isMounted = disk.children?.some((c) => c.mountpoint)
 
                 return (
-                  <div
-                    key={disk.name}
-                    className={`card p-4 transition-all duration-200 ${
-                      isSel
-                        ? 'ring-2 ring-accent-500 shadow-lg shadow-accent-500/10'
-                        : disk.isSystem
-                          ? 'opacity-60'
-                          : 'hover:border-accent-500/20'
-                    }`}
-                  >
+                  <div key={disk.name} className={`card p-4 transition-all duration-200 ${disk.isSystem ? 'opacity-60' : 'hover:border-accent-500/20'}`}>
                     <div className="flex items-start gap-3">
-                      <div className={`p-2 rounded-lg ${isSel ? 'bg-accent-500/20' : 'bg-base-800/60'} transition-all`}>
+                      <div className="p-2 rounded-lg bg-base-800/60">
                         <DiskTypeIcon disk={disk} />
                       </div>
                       <div className="flex-1 min-w-0">
@@ -225,31 +254,20 @@ export default function Storage() {
                           </div>
                         )}
                       </div>
-                      {/* Action buttons */}
                       <div className="flex items-center gap-1 shrink-0">
                         {!disk.isSystem && (
-                          <>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); toggleDisk(disk.name) }}
-                              className={`btn-ghost p-1.5 ${isSel ? 'text-accent-400' : 'text-[#5a5a6a]'}`}
-                              title="Select for pool"
-                            >
-                              <Check className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              onClick={(e) => { e.stopPropagation(); handleFormat(disk) }}
-                              disabled={formatting === disk.name}
-                              className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-accent-400"
-                              title="Format"
-                            >
-                              {formatting === disk.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
-                            </button>
-                          </>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleFormat(disk) }}
+                            disabled={formatting === disk.name}
+                            className="btn-ghost p-1.5 text-[#5a5a6a] hover:text-accent-400"
+                            title="Format"
+                          >
+                            {formatting === disk.name ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ExternalLink className="w-3.5 h-3.5" />}
+                          </button>
                         )}
                       </div>
                     </div>
 
-                    {/* Partitions */}
                     {hasParts && (
                       <div className="mt-3 space-y-1 border-t border-base-700/30 pt-3">
                         {disk.children.map((part) => (

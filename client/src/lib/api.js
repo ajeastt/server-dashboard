@@ -79,6 +79,8 @@ export const api = {
       fetchJson('/storage/pool', { method: 'POST', body: JSON.stringify({ name, mountPoints }) }),
     destroyPool: (name) =>
       fetchJson(`/storage/pool/${name}`, { method: 'DELETE' }),
+    createRaid: (name, level, devices) =>
+      fetchJson('/storage/raid', { method: 'POST', body: JSON.stringify({ name, level, devices }) }),
   },
   files: {
     list: (path = '/') => fetchJson(`/files/list?path=${encodeURIComponent(path)}`),

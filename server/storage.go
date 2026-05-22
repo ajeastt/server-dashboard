@@ -236,6 +236,95 @@ func DestroyMergerFSPool(name string) error {
 	return nil
 }
 
+// CreateRaidArray creates an mdadm RAID array, formats ext4, and mounts it
+func CreateRaidArray(name, level string, devices []string) error {
+	if err := EnsureMdAdmInstalled(); err != nil {
+		return fmt.Errorf("mdadm install failed: %w", err)
+	}
+
+	devicePath := fmt.Sprintf("/dev/md/%s", name)
+
+	// Unmount any existing partitions on the selected disks and wipe them
+	for _, d := range devices {
+		children := getPartitions(d)
+		for _, p := range children {
+			if p.Mountpoint != "" {
+				hostRun("umount", p.Mountpoint)
+				removeFromFstab(p.Mountpoint)
+			}
+		}
+		hostRun("wipefs", "-a", "/dev/"+d)
+	}
+
+	// Create RAID array
+	args := []string{"mdadm", "--create", devicePath, "--level=" + level, "--raid-devices=" + fmt.Sprint(len(devices))}
+	for _, d := range devices {
+		args = append(args, "/dev/"+d)
+	}
+	if _, err := hostRun(args...); err != nil {
+		return fmt.Errorf("mdadm create: %w", err)
+	}
+
+	// Wait for array to be ready
+	hostRun("mdadm", "--wait", devicePath)
+
+	// Format the array
+	if _, err := hostRun("mkfs.ext4", "-F", "-L", name, devicePath); err != nil {
+		hostRun("mdadm", "--stop", devicePath)
+		return fmt.Errorf("mkfs raid: %w", err)
+	}
+
+	// Get UUID
+	partName := fmt.Sprintf("md/%s", name)
+	uuid, err := getUUID(partName)
+	if err != nil {
+		hostRun("mdadm", "--stop", devicePath)
+		return fmt.Errorf("get uuid: %w", err)
+	}
+
+	// Mount
+	mp := mountPath(name)
+	hostRun("mkdir", "-p", mp)
+	if _, err := hostRun("mount", "UUID="+uuid, mp); err != nil {
+		hostRun("mdadm", "--stop", devicePath)
+		return fmt.Errorf("mount raid: %w", err)
+	}
+
+	addToFstab(uuid, mp, name)
+
+	return nil
+}
+
+// EnsureMdAdmInstalled checks and installs mdadm on the host
+func EnsureMdAdmInstalled() error {
+	if _, err := hostRun("which", "mdadm"); err == nil {
+		return nil
+	}
+	// Copy from container to host
+	if _, err := os.Stat("/sbin/mdadm"); err == nil {
+		data, err := os.ReadFile("/sbin/mdadm")
+		if err != nil {
+			return fmt.Errorf("read local mdadm: %w", err)
+		}
+		if err := os.WriteFile("/host/usr/local/sbin/mdadm", data, 0755); err != nil {
+			return fmt.Errorf("copy mdadm to host: %w", err)
+		}
+		// Also copy mdadm libraries/helpers
+		for _, lib := range []string{"/lib/libmd.so.0", "/lib/libudev.so.1"} {
+			if d, err := os.ReadFile(lib); err == nil {
+				os.MkdirAll("/host"+filepath.Dir(lib), 0755)
+				os.WriteFile("/host"+lib, d, 0644)
+			}
+		}
+		if _, err := hostRun("which", "mdadm"); err != nil {
+			return fmt.Errorf("mdadm not accessible after copy: %w", err)
+		}
+		return nil
+	}
+	_, err := hostRun("dnf", "install", "-y", "mdadm")
+	return err
+}
+
 // EnsureMergerFSInstalled checks and installs mergerfs on the host
 func EnsureMergerFSInstalled() error {
 	if _, err := hostRun("which", "mergerfs"); err == nil {

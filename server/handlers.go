@@ -280,6 +280,24 @@ func handleUnmountDevice(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true})
 }
 
+func handleCreateRaid(c *fiber.Ctx) error {
+	var body struct {
+		Name    string   `json:"name"`
+		Level   string   `json:"level"`
+		Devices []string `json:"devices"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "invalid body"})
+	}
+	if body.Level == "" {
+		body.Level = "0"
+	}
+	if err := CreateRaidArray(body.Name, body.Level, body.Devices); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	}
+	return c.JSON(fiber.Map{"success": true, "name": body.Name, "mountPoint": mountPath(body.Name)})
+}
+
 func handleCreatePool(c *fiber.Ctx) error {
 	var body struct {
 		Name        string   `json:"name"`
