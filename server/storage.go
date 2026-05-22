@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const mountBase = "/var/lib/casaos/volumes"
+const mountBase = "/mnt"
 
 type FormatProgress struct {
 	Device  string `json:"device"`
