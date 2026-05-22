@@ -301,20 +301,7 @@ func EnsureMdAdmInstalled() error {
 	if _, err := hostRun("which", "mdadm"); err == nil {
 		return nil
 	}
-	// Copy from container to host (static musl binary works standalone)
-	if _, err := os.Stat("/sbin/mdadm"); err == nil {
-		data, err := os.ReadFile("/sbin/mdadm")
-		if err != nil {
-			return fmt.Errorf("read local mdadm: %w", err)
-		}
-		if err := os.WriteFile("/host/usr/local/sbin/mdadm", data, 0755); err != nil {
-			return fmt.Errorf("copy mdadm to host: %w", err)
-		}
-		if _, err := hostRun("which", "mdadm"); err != nil {
-			return fmt.Errorf("mdadm not accessible after copy: %w", err)
-		}
-		return nil
-	}
+	// Install via dnf (Fedora) — never copy musl-linked Alpine binary
 	_, err := hostRun("dnf", "install", "-y", "mdadm")
 	return err
 }
