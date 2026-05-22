@@ -21,8 +21,8 @@ RUN apk add --no-cache docker-cli docker-compose e2fsprogs parted util-linux fus
 # Download static mergerfs binary (not in repos for all arches)
 RUN wget -qO /tmp/mergerfs.tar.gz https://github.com/trapexit/mergerfs/releases/download/2.40.2/mergerfs-static-linux_amd64.tar.gz \
   && tar xzf /tmp/mergerfs.tar.gz -C /tmp/ \
-  && cp /tmp/mergerfs-static-linux_amd64/mergerfs /usr/bin/mergerfs \
-  && rm -rf /tmp/mergerfs*
+  && cp /tmp/usr/local/bin/mergerfs /usr/bin/mergerfs \
+  && rm -rf /tmp/mergerfs* /tmp/usr
 WORKDIR /app
 COPY --from=go-builder /app/server-dashboard .
 COPY --from=frontend-builder /app/dist ./client/dist
