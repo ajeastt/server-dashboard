@@ -267,6 +267,7 @@ func CreateRaidArray(name, level string, devices []string) error {
 
 	// Wait for array to be ready
 	hostRun("mdadm", "--wait", devicePath)
+	hostRun("udevadm", "settle")
 
 	// Format the array
 	if _, err := hostRun("mkfs.ext4", "-F", "-L", name, devicePath); err != nil {
@@ -300,7 +301,7 @@ func EnsureMdAdmInstalled() error {
 	if _, err := hostRun("which", "mdadm"); err == nil {
 		return nil
 	}
-	// Copy from container to host
+	// Copy from container to host (static musl binary works standalone)
 	if _, err := os.Stat("/sbin/mdadm"); err == nil {
 		data, err := os.ReadFile("/sbin/mdadm")
 		if err != nil {
@@ -308,13 +309,6 @@ func EnsureMdAdmInstalled() error {
 		}
 		if err := os.WriteFile("/host/usr/local/sbin/mdadm", data, 0755); err != nil {
 			return fmt.Errorf("copy mdadm to host: %w", err)
-		}
-		// Also copy mdadm libraries/helpers
-		for _, lib := range []string{"/lib/libmd.so.0", "/lib/libudev.so.1"} {
-			if d, err := os.ReadFile(lib); err == nil {
-				os.MkdirAll("/host"+filepath.Dir(lib), 0755)
-				os.WriteFile("/host"+lib, d, 0644)
-			}
 		}
 		if _, err := hostRun("which", "mdadm"); err != nil {
 			return fmt.Errorf("mdadm not accessible after copy: %w", err)
