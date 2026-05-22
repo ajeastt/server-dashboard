@@ -109,7 +109,7 @@ export default function StackDetail() {
   return (
     <div className="space-y-4 animate-fade-in">
       {/* Header */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 sticky top-0 z-20 bg-base-950 py-3 border-b border-base-700/30 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
         <Link to="/containers" className="p-1 rounded text-[#8a8a9a] hover:text-[#e4e4ed] hover:bg-white/[0.04] transition-all"><ArrowLeft className="w-4 h-4" /></Link>
         <Layers className="w-5 h-5 text-accent-400" />
         <div className="flex-1">
@@ -132,7 +132,7 @@ export default function StackDetail() {
             <span className="text-xs font-medium text-[#8a8a9a]">docker-compose.yml</span>
             <button onClick={handleSave} disabled={saving} className="btn-ghost text-xs p-1"><Save className="w-3 h-3" /> Save</button>
           </div>
-          <CodeEditor lang="yaml" value={compose} onChange={setCompose} minHeight="400px" />
+          <CodeEditor lang="yaml" value={compose} onChange={setCompose} minHeight="400px" maxHeight="calc(100vh - 260px)" />
         </div>
 
         {/* Service list */}
