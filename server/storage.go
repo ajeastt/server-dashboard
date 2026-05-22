@@ -60,6 +60,19 @@ func formatDevice(diskName, label string) (*FormatResult, error) {
 	disk := "/dev/" + diskName
 	children := getPartitions(diskName)
 
+	// Step 0: stop any md RAID array using this disk
+	holdersOut, _ := hostRun("ls", "-1", "/sys/block/"+diskName+"/holders/")
+	for _, h := range strings.Fields(holdersOut) {
+		mdDev := "/dev/" + h
+		// Unmount any targets mounted from this md device
+		mountOut, _ := hostRun("findmnt", "-n", "-o", "TARGET", "--source", mdDev)
+		for _, t := range strings.Fields(mountOut) {
+			hostRun("umount", t)
+			removeFromFstab(t)
+		}
+		hostRun("mdadm", "--stop", mdDev)
+	}
+
 	// Step 1: unmount any mounted partitions on the host
 	for _, part := range children {
 		if part.Mountpoint != "" {
