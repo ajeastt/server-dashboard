@@ -238,10 +238,25 @@ func DestroyMergerFSPool(name string) error {
 
 // EnsureMergerFSInstalled checks and installs mergerfs on the host
 func EnsureMergerFSInstalled() error {
-	_, err := hostRun("which", "mergerfs")
-	if err == nil {
+	if _, err := hostRun("which", "mergerfs"); err == nil {
 		return nil
 	}
-	_, err = hostRun("dnf", "install", "-y", "mergerfs")
+	// Try to copy mergerfs from container to host
+	if _, err := os.Stat("/usr/bin/mergerfs"); err == nil {
+		data, err := os.ReadFile("/usr/bin/mergerfs")
+		if err != nil {
+			return fmt.Errorf("read local mergerfs: %w", err)
+		}
+		if err := os.WriteFile("/host/usr/local/bin/mergerfs", data, 0755); err != nil {
+			return fmt.Errorf("copy mergerfs to host: %w", err)
+		}
+		// Verify it works on the host
+		if _, err := hostRun("which", "mergerfs"); err != nil {
+			return fmt.Errorf("mergerfs not accessible on host after copy: %w", err)
+		}
+		return nil
+	}
+	// Try dnf as fallback
+	_, err := hostRun("dnf", "install", "-y", "mergerfs")
 	return err
 }

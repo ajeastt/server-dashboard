@@ -16,9 +16,13 @@ RUN CGO_ENABLED=0 go build -o server-dashboard .
 FROM alpine:3.21
 # docker-cli, docker-compose for container management
 # e2fsprogs for mkfs.ext4, parted for GPT partition tables, util-linux for lsblk/blkid/wipefs
-# mergerfs (community repo) for storage pooling, fuse for FUSE support
-RUN apk add --no-cache docker-cli docker-compose e2fsprogs parted util-linux fuse \
-  && apk add --no-cache -X http://dl-cdn.alpinelinux.org/alpine/v3.21/community mergerfs || true
+# mergerfs for storage pooling, fuse for FUSE support
+RUN apk add --no-cache docker-cli docker-compose e2fsprogs parted util-linux fuse wget
+# Download static mergerfs binary (not in repos for all arches)
+RUN wget -qO /tmp/mergerfs.tar.gz https://github.com/trapexit/mergerfs/releases/download/2.40.2/mergerfs-static-linux_amd64.tar.gz \
+  && tar xzf /tmp/mergerfs.tar.gz -C /tmp/ \
+  && cp /tmp/mergerfs-static-linux_amd64/mergerfs /usr/bin/mergerfs \
+  && rm -rf /tmp/mergerfs*
 WORKDIR /app
 COPY --from=go-builder /app/server-dashboard .
 COPY --from=frontend-builder /app/dist ./client/dist
